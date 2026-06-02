@@ -3,6 +3,8 @@ import { BusinessType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createUserSession, hashPassword } from "@/lib/saas-auth";
 
+const masterEmail = "anjobrito@gmail.com";
+
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
 }
@@ -63,10 +65,13 @@ export async function POST(request: Request) {
         subscriptionStatus: "TRIAL",
         subscription: {
           create: {
-            plan: "BASIC",
-            status: "TRIAL",
-            priceCents: 9700,
-            trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            plan: email === masterEmail ? "ENTERPRISE" : "BASIC",
+            status: email === masterEmail ? "ACTIVE" : "TRIAL",
+            priceCents: email === masterEmail ? 0 : 9700,
+            trialEndsAt: email === masterEmail ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            expiresAt: email === masterEmail ? new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000) : null,
+            lastPaidAt: email === masterEmail ? new Date() : null,
+            notes: email === masterEmail ? "Master AJBSYSTEMS account" : "Trial created from public registration",
           },
         },
       },
@@ -79,6 +84,7 @@ export async function POST(request: Request) {
         email,
         passwordHash: hashPassword(password),
         role: "OWNER",
+        systemRole: email === masterEmail ? "MASTER" : "NONE",
       },
     });
 
