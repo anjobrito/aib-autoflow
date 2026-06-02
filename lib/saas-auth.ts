@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 const sessionCookieName = "ajb_session";
 const sessionDurationDays = 30;
+const systemAdminRoles = new Set(["MASTER", "BILLING", "SUPPORT"]);
 
 function getPasswordSecret() {
   return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "ajb-autoflow-local-dev-secret";
@@ -71,7 +72,7 @@ export async function getCurrentSession() {
 
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { user: true, company: true },
+    include: { user: true, company: { include: { subscription: true } } },
   });
 
   if (!session || session.status !== "ACTIVE" || session.expiresAt < new Date() || !session.user.active) {
@@ -81,9 +82,35 @@ export async function getCurrentSession() {
   return session;
 }
 
+export function getLicenseBlockReason(session: Awaited<ReturnType<typeof getCurrentSession>>) {
+  if (!session) return "Sessão inválida.";
+  if (systemAdminRoles.has(session.user.systemRole)) return null;
+
+  if (session.company.accessBlocked) {
+    return session.company.lockedReason || "Acesso bloqueado pelo administrador.";
+  }
+
+  if (session.company.subscriptionStatus === "BLOCKED") return "Empresa bloqueada por pendência administrativa.";
+  if (session.company.subscriptionStatus === "CANCELED") return "Assinatura cancelada.";
+
+  const subscription = session.company.subscription;
+  const now = new Date();
+
+  if (subscription?.status === "BLOCKED") return "Assinatura bloqueada.";
+  if (subscription?.status === "CANCELED") return "Assinatura cancelada.";
+  if (subscription?.expiresAt && subscription.expiresAt < now) return "Assinatura vencida.";
+  if (subscription?.status === "TRIAL" && subscription.trialEndsAt && subscription.trialEndsAt < now) return "Período de demonstração expirado.";
+
+  return null;
+}
+
 export async function requireCurrentSession() {
   const session = await getCurrentSession();
   if (!session) throw new Error("Unauthorized");
+
+  const blockReason = getLicenseBlockReason(session);
+  if (blockReason) throw new Error(`LicenseBlocked:${blockReason}`);
+
   return session;
 }
 
