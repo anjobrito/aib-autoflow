@@ -12,6 +12,9 @@ enum BusinessType {
   CAR_WASH
   AUTO_DETAILING
   AUTO_PARTS
+  CAR_DEALERSHIP
+  PARKING_LOT
+  FULL_AUTO_CENTER
   OTHER
 }
 
@@ -20,12 +23,18 @@ enum UserRole {
   MANAGER
   MECHANIC
   ATTENDANT
+  SALES
+  FINANCIAL
 }
 
 enum WorkOrderStatus {
   OPEN
+  QUOTE
+  APPROVED
   IN_PROGRESS
   WAITING_PARTS
+  PAINTING
+  FINISHING
   READY_FOR_PICKUP
   DELIVERED
   CANCELED
@@ -45,6 +54,12 @@ enum SubscriptionStatus {
   BLOCKED
 }
 
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
 model Company {
   id                 String             @id @default(cuid())
   name               String
@@ -60,6 +75,7 @@ model Company {
   updatedAt          DateTime           @updatedAt
 
   users              User[]
+  sessions           Session[]
   customers          Customer[]
   vehicles           Vehicle[]
   products           Product[]
@@ -70,19 +86,39 @@ model Company {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String
-  email     String   @unique
-  password  String
-  role      UserRole @default(ATTENDANT)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String    @id @default(cuid())
+  companyId    String
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(ATTENDANT)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
+  company      Company   @relation(fields: [companyId], references: [id])
+  sessions     Session[]
 
   @@index([companyId])
+}
+
+model Session {
+  id        String        @id @default(cuid())
+  companyId String
+  userId    String
+  tokenHash String        @unique
+  status    SessionStatus @default(ACTIVE)
+  expiresAt DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  company   Company       @relation(fields: [companyId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Customer {
@@ -94,6 +130,7 @@ model Customer {
   phone     String?
   city      String?
   state     String?
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -103,6 +140,7 @@ model Customer {
   reminders MaintenanceReminder[]
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model Vehicle {
@@ -115,6 +153,8 @@ model Vehicle {
   year       Int?
   color      String?
   mileage    Int?
+  powertrain String?
+  active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -125,6 +165,7 @@ model Vehicle {
 
   @@index([companyId])
   @@index([customerId])
+  @@index([companyId, plate])
 }
 
 model Product {
@@ -135,6 +176,7 @@ model Product {
   name         String
   category     String?
   brand        String?
+  supplierName String?
   costPrice    Decimal  @default(0)
   salePrice    Decimal  @default(0)
   currentStock Decimal  @default(0)
@@ -146,13 +188,16 @@ model Product {
   company      Company  @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model Service {
   id          String   @id @default(cuid())
   companyId   String
   name        String
+  category    String?
   description String?
+  duration    String?
   price       Decimal  @default(0)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -161,31 +206,33 @@ model Service {
   company     Company  @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model WorkOrder {
-  id          String          @id @default(cuid())
-  companyId   String
-  customerId  String
-  vehicleId   String
-  code        String
-  status      WorkOrderStatus @default(OPEN)
-  description String?
-  totalParts  Decimal         @default(0)
-  totalServices Decimal       @default(0)
-  totalAmount Decimal         @default(0)
-  openedAt    DateTime        @default(now())
-  closedAt    DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  companyId     String
+  customerId    String
+  vehicleId     String
+  code          String
+  status        WorkOrderStatus @default(OPEN)
+  description   String?
+  totalParts    Decimal         @default(0)
+  totalServices Decimal         @default(0)
+  totalAmount   Decimal         @default(0)
+  openedAt      DateTime        @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  company     Company         @relation(fields: [companyId], references: [id])
-  customer    Customer        @relation(fields: [customerId], references: [id])
-  vehicle     Vehicle         @relation(fields: [vehicleId], references: [id])
+  company       Company         @relation(fields: [companyId], references: [id])
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  vehicle       Vehicle         @relation(fields: [vehicleId], references: [id])
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([companyId, code])
 }
 
 model MaintenanceReminder {
@@ -210,15 +257,16 @@ model MaintenanceReminder {
 }
 
 model Subscription {
-  id        String             @id @default(cuid())
-  companyId String             @unique
-  plan      String             @default("START")
-  status    SubscriptionStatus @default(TRIAL)
-  priceCents Int               @default(4990)
-  startedAt DateTime           @default(now())
-  expiresAt DateTime?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id         String             @id @default(cuid())
+  companyId  String             @unique
+  plan       String             @default("BASIC")
+  status     SubscriptionStatus @default(TRIAL)
+  priceCents Int                @default(9700)
+  startedAt  DateTime           @default(now())
+  trialEndsAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 
-  company   Company            @relation(fields: [companyId], references: [id])
+  company    Company            @relation(fields: [companyId], references: [id])
 }
