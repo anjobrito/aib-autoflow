@@ -15,6 +15,17 @@ function Input({ name, label, placeholder, type = "text", required = true }: { n
   );
 }
 
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: false, message: text };
+  }
+}
+
 export default function CadastroPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,20 +35,30 @@ export default function CadastroPage() {
     setLoading(true);
     setMessage("");
 
-    const response = await fetch("/api/auth/register", {
-      method: "POST",
-      body: new FormData(event.currentTarget),
-    });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
 
-    const result = await response.json();
-    setLoading(false);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        body: new FormData(event.currentTarget),
+        signal: controller.signal,
+      });
 
-    if (!response.ok || !result.success) {
-      setMessage(result.message || "Não foi possível criar a conta.");
-      return;
+      const result = await readJsonResponse(response);
+
+      if (!response.ok || !result.success) {
+        setMessage(result.message || "Não foi possível criar a conta. Verifique o banco e tente novamente.");
+        return;
+      }
+
+      window.location.href = result.redirectTo || "/dashboard";
+    } catch (error) {
+      setMessage(error instanceof DOMException && error.name === "AbortError" ? "O cadastro demorou demais para responder. Verifique a conexão com o banco e tente novamente." : "Erro inesperado ao criar a conta. Verifique o terminal do Next.js.");
+    } finally {
+      window.clearTimeout(timeout);
+      setLoading(false);
     }
-
-    window.location.href = result.redirectTo || "/dashboard";
   }
 
   return (
