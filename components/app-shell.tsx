@@ -112,6 +112,31 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
 
   useEffect(() => {
+    let active = true;
+
+    async function checkLicense() {
+      try {
+        const response = await fetch("/api/license/status", { cache: "no-store" });
+        const result = await response.json();
+
+        if (!active) return;
+
+        if (response.ok && result.authenticated && !result.allowed) {
+          window.location.href = "/licenca";
+        }
+      } catch {
+        // Keep the UI available while local development services are starting.
+      }
+    }
+
+    checkLicense();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     function refreshBusinessType() {
       setBusinessType(getCompany().businessType || "Completo / Multioperação");
     }
