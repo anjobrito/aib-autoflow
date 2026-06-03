@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createUserSession, verifyPassword } from "@/lib/saas-auth";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
 }
