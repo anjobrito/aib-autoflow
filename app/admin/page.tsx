@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { ShieldCheck, RefreshCw, Building2 } from "lucide-react";
+import { ShieldCheck, RefreshCw, Building2, LogOut } from "lucide-react";
 
 type AdminCompany = {
   id: string;
@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function loadCompanies() {
     setLoading(true);
@@ -84,6 +85,17 @@ export default function AdminPage() {
   useEffect(() => {
     loadCompanies();
   }, []);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/entrar";
+    }
+  }
 
   async function handleLicenseSubmit(event: FormEvent<HTMLFormElement>, companyId: string) {
     event.preventDefault();
@@ -116,10 +128,16 @@ export default function AdminPage() {
               <p className="text-xs text-blue-100">Licenças, trials e assinaturas</p>
             </div>
           </div>
-          <button type="button" onClick={loadCompanies} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950">
-            <RefreshCw className="h-4 w-4" />
-            Atualizar
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={loadCompanies} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950">
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </button>
+            <button type="button" onClick={handleLogout} disabled={loggingOut} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-black text-white hover:bg-white hover:text-slate-950 disabled:opacity-60">
+              <LogOut className="h-4 w-4" />
+              {loggingOut ? "Saindo..." : "Sair"}
+            </button>
+          </div>
         </div>
       </section>
 
