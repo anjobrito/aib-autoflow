@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { SubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { adminErrorResponse, requireBillingAdmin } from "@/lib/admin-auth";
+import { platformAdminErrorResponse, requireBillingPlatformAdmin } from "@/lib/platform-admin-auth";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -19,7 +19,7 @@ function isSubscriptionStatus(value: string): value is SubscriptionStatus {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireBillingAdmin();
+    await requireBillingPlatformAdmin();
     const { id } = await params;
     const formData = await request.formData();
 
@@ -79,6 +79,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: true, ...updated });
   } catch (error) {
-    return adminErrorResponse(error);
+    return platformAdminErrorResponse(error);
   }
 }
