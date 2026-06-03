@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Car, ClipboardList, Gauge, Package, Smartphone } from "lucide-react";
+import { ArrowRight, Bell, Car, ClipboardList, Gauge, LogIn, Package, Smartphone } from "lucide-react";
 
 const features = [
   ["Ordens de serviço", "Abra e acompanhe serviços com status claros.", ClipboardList],
@@ -23,14 +23,18 @@ export default function Home() {
               </div>
             </div>
             <nav className="hidden items-center gap-3 sm:flex">
+              <a href="/entrar" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2 text-sm font-bold text-white hover:bg-white/10">
+                <LogIn className="h-4 w-4" />
+                Já sou cliente
+              </a>
               <a href="/demo" className="rounded-full border border-white/20 px-5 py-2 text-sm font-bold text-white hover:bg-white/10">
                 Demo guiada
               </a>
               <a href="/planos" className="rounded-full border border-white/20 px-5 py-2 text-sm font-bold text-white hover:bg-white/10">
                 Planos
               </a>
-              <a href="/comece-agora" className="rounded-full bg-white px-5 py-2 text-sm font-black text-slate-950">
-                Comece agora
+              <a href="/cadastro" className="rounded-full bg-white px-5 py-2 text-sm font-black text-slate-950">
+                Criar conta
               </a>
             </nav>
           </header>
@@ -48,14 +52,14 @@ export default function Home() {
                 Organize clientes, veículos, estoque, serviços e ordens de serviço em uma plataforma online multiempresa.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a href="/comece-agora" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-500 px-6 py-4 font-bold text-white hover:bg-blue-400">
-                  Comece agora <ArrowRight className="h-5 w-5" />
+                <a href="/cadastro" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-500 px-6 py-4 font-bold text-white hover:bg-blue-400">
+                  Criar conta <ArrowRight className="h-5 w-5" />
+                </a>
+                <a href="/entrar" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-6 py-4 font-bold text-white hover:bg-white/10">
+                  <LogIn className="h-5 w-5" /> Já sou cliente
                 </a>
                 <a href="/demo" className="inline-flex items-center justify-center rounded-2xl border border-white/20 px-6 py-4 font-bold text-white hover:bg-white/10">
                   Ver demo guiada
-                </a>
-                <a href="/planos" className="inline-flex items-center justify-center rounded-2xl border border-white/20 px-6 py-4 font-bold text-white hover:bg-white/10">
-                  Ver planos
                 </a>
               </div>
             </div>
@@ -110,9 +114,9 @@ export default function Home() {
           <p className="mt-8 text-5xl font-black">R$ 49,90</p>
           <p className="mt-1 text-sm text-slate-300">por mês por empresa</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a href="/comece-agora" className="inline-flex rounded-2xl bg-blue-500 px-6 py-4 font-black text-white hover:bg-blue-400">Começar teste agora</a>
+            <a href="/cadastro" className="inline-flex rounded-2xl bg-blue-500 px-6 py-4 font-black text-white hover:bg-blue-400">Criar conta</a>
+            <a href="/entrar" className="inline-flex rounded-2xl border border-white/20 px-6 py-4 font-black text-white hover:bg-white/10">Já sou cliente</a>
             <a href="/demo" className="inline-flex rounded-2xl border border-white/20 px-6 py-4 font-black text-white hover:bg-white/10">Ver demo guiada</a>
-            <a href="/planos" className="inline-flex rounded-2xl border border-white/20 px-6 py-4 font-black text-white hover:bg-white/10">Ver todos os planos</a>
           </div>
         </div>
       </section>
