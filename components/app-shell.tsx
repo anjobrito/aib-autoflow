@@ -14,6 +14,7 @@ import {
   HandCoins,
   History,
   LayoutDashboard,
+  LogOut,
   Package,
   Receipt,
   Settings,
@@ -110,6 +111,7 @@ function findActiveGroup(pathname: string, groups: MenuGroup[]) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -151,6 +153,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/entrar";
+    }
+  }
+
   const businessProfile = useMemo(() => getBusinessProfileByLabel(businessType), [businessType]);
   const visibleMenuGroups = useMemo(() => filterMenuGroups(businessProfile.label), [businessProfile.label]);
   const activeGroup = useMemo(() => findActiveGroup(pathname, visibleMenuGroups), [pathname, visibleMenuGroups]);
@@ -184,7 +197,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="mt-1 text-xs leading-5 text-slate-300">Menu adaptado ao universo da empresa.</p>
           </div>
 
-          <nav className="mt-5 grid max-h-[calc(100vh-230px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
+          <nav className="mt-5 grid max-h-[calc(100vh-300px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
             {visibleMenuGroups.map((group) => {
               const isOpen = openGroups.includes(group.title);
               const hasActiveItem = group.title === activeGroup;
@@ -227,6 +240,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-2">
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-slate-200 transition hover:bg-white hover:text-slate-950 disabled:opacity-60"
+            >
+              <LogOut className="h-4 w-4" />
+              {loggingOut ? "Saindo..." : "Sair do sistema"}
+            </button>
+          </div>
         </aside>
         <section className="grid gap-6">{children}</section>
       </div>
