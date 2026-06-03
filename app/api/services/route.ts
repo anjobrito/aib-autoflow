@@ -75,3 +75,41 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, service: formatService(service) });
 }
+
+export async function PUT(request: Request) {
+  const session = await requireCurrentSession();
+  const formData = await request.formData();
+
+  const id = normalize(formData.get("id"));
+  const name = normalize(formData.get("name"));
+  const category = normalize(formData.get("category"));
+  const duration = normalize(formData.get("duration"));
+  const price = parseMoneyToNumber(normalize(formData.get("price")));
+  const status = normalize(formData.get("status")) || "Ativo";
+
+  if (!id) {
+    return NextResponse.json({ success: false, message: "ID do serviço é obrigatório." }, { status: 400 });
+  }
+
+  if (!name) {
+    return NextResponse.json({ success: false, message: "Nome do serviço é obrigatório." }, { status: 400 });
+  }
+
+  const existing = await prisma.service.findFirst({ where: { id, companyId: session.companyId } });
+  if (!existing) {
+    return NextResponse.json({ success: false, message: "Serviço não encontrado." }, { status: 404 });
+  }
+
+  const service = await prisma.service.update({
+    where: { id },
+    data: {
+      name,
+      category,
+      duration,
+      price,
+      active: status !== "Inativo",
+    },
+  });
+
+  return NextResponse.json({ success: true, service: formatService(service) });
+}
