@@ -1,5 +1,12 @@
 DO $$
 BEGIN
+  CREATE TYPE "SessionStatus" AS ENUM ('ACTIVE', 'REVOKED', 'EXPIRED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
   CREATE TYPE "PlatformAdminRole" AS ENUM ('SUPPORT', 'BILLING', 'MASTER');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
