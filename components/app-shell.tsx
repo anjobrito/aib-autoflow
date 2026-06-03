@@ -197,7 +197,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="mt-1 text-xs leading-5 text-slate-300">Menu adaptado ao universo da empresa.</p>
           </div>
 
-          <nav className="mt-5 grid max-h-[calc(100vh-300px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
+          <nav className="mt-5 grid max-h-[calc(100vh-325px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
             {visibleMenuGroups.map((group) => {
               const isOpen = openGroups.includes(group.title);
               const hasActiveItem = group.title === activeGroup;
@@ -241,16 +241,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-2">
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Sessão</p>
             <button
               type="button"
               onClick={handleLogout}
               disabled={loggingOut}
-              className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black text-slate-200 transition hover:bg-white hover:text-slate-950 disabled:opacity-60"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-3 text-sm font-black text-red-100 transition hover:bg-red-500 hover:text-white disabled:opacity-60"
             >
               <LogOut className="h-4 w-4" />
-              {loggingOut ? "Saindo..." : "Sair do sistema"}
+              {loggingOut ? "Encerrando..." : "Encerrar sessão"}
             </button>
+            <p className="mt-2 px-1 text-[11px] leading-4 text-slate-500">Use ao finalizar o atendimento ou trocar de usuário.</p>
           </div>
         </aside>
         <section className="grid gap-6">{children}</section>
