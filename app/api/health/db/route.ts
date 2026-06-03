@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function getSafeDatabaseError(error: unknown) {
   if (error instanceof Error) {
     if (error.message.includes("Environment variable not found")) return "DATABASE_URL não configurada no ambiente do deploy.";
@@ -27,6 +30,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       database: "ok",
+      runtime: "nodejs",
       env: {
         DATABASE_URL: hasDatabaseUrl ? "configured" : "missing",
         preview: databaseUrlPreview,
@@ -37,6 +41,7 @@ export async function GET() {
     return NextResponse.json({
       success: false,
       database: "error",
+      runtime: "nodejs",
       env: {
         DATABASE_URL: hasDatabaseUrl ? "configured" : "missing",
         preview: databaseUrlPreview,
