@@ -28,7 +28,7 @@ export default function AdminEntrarPage() {
     const timeout = window.setTimeout(() => controller.abort(), 20000);
 
     try {
-      const response = await fetch("/api/admin/auth/login", {
+      const response = await fetch("/api/admin/auth/signin", {
         method: "POST",
         body: new FormData(event.currentTarget),
         signal: controller.signal,
@@ -69,7 +69,7 @@ export default function AdminEntrarPage() {
 
           <div className="mt-6 grid gap-4">
             <label className="grid gap-2 text-sm font-bold text-slate-700">E-mail administrativo<input name="email" type="email" required autoComplete="email" placeholder="anjobrito@gmail.com" className={inputClass} /></label>
-            <label className="grid gap-2 text-sm font-bold text-slate-700">Senha administrativa<input name="password" type="password" required autoComplete="current-password" placeholder="Senha do admin AJBSYSTEMS" className={inputClass} /></label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">Senha administrativa<input name="adminPassword" type="password" required autoComplete="current-password" placeholder="Senha do admin AJBSYSTEMS" className={inputClass} /></label>
           </div>
 
           {message ? <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{message}</div> : null}
