@@ -5,6 +5,17 @@ import { ArrowRight, Gauge } from "lucide-react";
 
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
 
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: false, message: text };
+  }
+}
+
 export default function EntrarPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,20 +25,30 @@ export default function EntrarPage() {
     setLoading(true);
     setMessage("");
 
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      body: new FormData(event.currentTarget),
-    });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
 
-    const result = await response.json();
-    setLoading(false);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        body: new FormData(event.currentTarget),
+        signal: controller.signal,
+      });
 
-    if (!response.ok || !result.success) {
-      setMessage(result.message || "Não foi possível entrar.");
-      return;
+      const result = await readJsonResponse(response);
+
+      if (!response.ok || !result.success) {
+        setMessage(result.message || "Não foi possível entrar. Verifique e-mail, senha e liberação da empresa.");
+        return;
+      }
+
+      window.location.href = result.redirectTo || "/dashboard";
+    } catch (error) {
+      setMessage(error instanceof DOMException && error.name === "AbortError" ? "O login demorou demais para responder. Verifique a conexão com o banco e tente novamente." : "Erro inesperado ao entrar. Verifique o log do deploy ou o terminal do Next.js.");
+    } finally {
+      window.clearTimeout(timeout);
+      setLoading(false);
     }
-
-    window.location.href = result.redirectTo || "/dashboard";
   }
 
   return (
