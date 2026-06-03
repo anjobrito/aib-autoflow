@@ -30,7 +30,6 @@ type AdminCompany = {
     name: string;
     email: string;
     role: string;
-    systemRole: string;
     active: boolean;
   }>;
   _count: {
@@ -91,9 +90,9 @@ export default function AdminPage() {
     setLoggingOut(true);
 
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/admin/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/entrar";
+      window.location.href = "/admin/entrar";
     }
   }
 
@@ -124,8 +123,8 @@ export default function AdminPage() {
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500"><ShieldCheck className="h-6 w-6" /></div>
             <div>
-              <p className="text-lg font-black tracking-tight">AJB AutoFlow Admin</p>
-              <p className="text-xs text-blue-100">Licenças, trials e assinaturas</p>
+              <p className="text-lg font-black tracking-tight">AJBSYSTEMS Admin</p>
+              <p className="text-xs text-blue-100">Billing, licenças, trials e suporte</p>
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -143,11 +142,11 @@ export default function AdminPage() {
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 sm:px-10 lg:px-16">
         <div className="rounded-3xl bg-white p-6 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-blue-700">Admin Master</p>
+          <p className="text-sm font-black uppercase tracking-wide text-blue-700">Administração da plataforma</p>
           <h1 className="mt-1 text-3xl font-black">Controle comercial do SaaS</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Use esta tela para liberar demo/trial, bloquear inadimplentes, ativar clientes pagos e acompanhar empresas cadastradas.
-            O usuário master é anjobrito@gmail.com. Usuários SUPPORT veem empresas; BILLING e MASTER podem alterar licenças.
+            Esta área é exclusiva da AJBSYSTEMS. MASTER controla tudo, BILLING altera licenças e SUPPORT acompanha empresas para suporte.
+            Usuários de oficina entram pelo AJB AutoFlow em /entrar e usam roles próprias da empresa cliente.
           </p>
         </div>
 
@@ -179,9 +178,9 @@ export default function AdminPage() {
                       <p><strong>Cadastros:</strong> {company._count.customers} clientes / {company._count.vehicles} veículos / {company._count.workOrders} OS</p>
                     </div>
                     <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                      <p className="font-black text-slate-950">Usuários</p>
+                      <p className="font-black text-slate-950">Usuários da empresa cliente</p>
                       <div className="mt-2 grid gap-1">
-                        {company.users.map((user) => <p key={user.id}>{user.name} — {user.email} — {user.role} / {user.systemRole}</p>)}
+                        {company.users.map((user) => <p key={user.id}>{user.name} — {user.email} — {user.role}</p>)}
                       </div>
                     </div>
                   </div>
