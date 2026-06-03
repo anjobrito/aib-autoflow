@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { adminErrorResponse, requireSupportAdmin } from "@/lib/admin-auth";
+import { platformAdminErrorResponse, requireSupportPlatformAdmin } from "@/lib/platform-admin-auth";
 
 export async function GET() {
   try {
-    await requireSupportAdmin();
+    await requireSupportPlatformAdmin();
 
     const companies = await prisma.company.findMany({
       orderBy: { createdAt: "desc" },
@@ -16,7 +16,6 @@ export async function GET() {
             name: true,
             email: true,
             role: true,
-            systemRole: true,
             active: true,
           },
           orderBy: { createdAt: "asc" },
@@ -33,6 +32,6 @@ export async function GET() {
 
     return NextResponse.json({ success: true, companies });
   } catch (error) {
-    return adminErrorResponse(error);
+    return platformAdminErrorResponse(error);
   }
 }
