@@ -1,4 +1,9 @@
-CREATE TYPE IF NOT EXISTS "PlatformAdminRole" AS ENUM ('SUPPORT', 'BILLING', 'MASTER');
+DO $$
+BEGIN
+  CREATE TYPE "PlatformAdminRole" AS ENUM ('SUPPORT', 'BILLING', 'MASTER');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "PlatformAdmin" (
   "id" TEXT NOT NULL,
@@ -31,6 +36,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "PlatformAdminSession_tokenHash_key" ON "Platf
 CREATE INDEX IF NOT EXISTS "PlatformAdminSession_adminId_idx" ON "PlatformAdminSession"("adminId");
 CREATE INDEX IF NOT EXISTS "PlatformAdminSession_expiresAt_idx" ON "PlatformAdminSession"("expiresAt");
 
-ALTER TABLE "PlatformAdminSession"
-ADD CONSTRAINT "PlatformAdminSession_adminId_fkey"
-FOREIGN KEY ("adminId") REFERENCES "PlatformAdmin"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+  ALTER TABLE "PlatformAdminSession"
+  ADD CONSTRAINT "PlatformAdminSession_adminId_fkey"
+  FOREIGN KEY ("adminId") REFERENCES "PlatformAdmin"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
