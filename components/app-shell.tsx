@@ -88,9 +88,10 @@ const menuGroups: MenuGroup[] = [
   },
   {
     title: "Sistema",
-    description: "empresa e ajustes",
+    description: "empresa e usuários",
     items: [
       { key: "empresa", label: "Empresa", href: "/empresa", icon: Settings },
+      { key: "usuarios", label: "Usuários", href: "/usuarios", icon: UserRoundCog },
     ],
   },
 ];
@@ -99,7 +100,7 @@ function filterMenuGroups(businessType: string) {
   return menuGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => isMenuKeyAllowedForBusinessProfile(item.key, businessType)),
+      items: group.items.filter((item) => item.key === "usuarios" || isMenuKeyAllowedForBusinessProfile(item.key, businessType)),
     }))
     .filter((group) => group.items.length > 0);
 }
