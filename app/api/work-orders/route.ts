@@ -48,17 +48,32 @@ function formatCurrency(value: unknown) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function extractProduct(description?: string | null) {
+  if (!description) return "Não informado";
+  const itemPart = description.split("|").map((part) => part.trim()).find((part) => part.toLowerCase().startsWith("item:"));
+  return itemPart?.replace(/^item:\s*/i, "") || "Não informado";
+}
+
 function formatOrder(order: any) {
+  const plate = order.vehicle?.plate || "";
+  const vehicleName = `${plate} - ${order.vehicle?.brand || ""} ${order.vehicle?.model || ""}`.trim();
+
   return {
     id: order.id,
     code: order.code,
     customer: order.customer?.name || "Cliente não informado",
-    vehicle: `${order.vehicle?.plate || ""} - ${order.vehicle?.brand || ""} ${order.vehicle?.model || ""}`.trim(),
+    vehicle: vehicleName,
+    plate,
+    powertrain: order.vehicle?.powertrain || "Não informado",
     service: order.description || "Atendimento operacional",
+    product: extractProduct(order.description),
     responsibleEmployeeName: "Não definido",
     status: statusLabel(order.status),
     statusCode: order.status,
     total: formatCurrency(order.totalAmount),
+    totalAmount: Number(order.totalAmount || 0),
+    openedAt: order.openedAt,
+    closedAt: order.closedAt,
     origin: "Banco",
   };
 }
@@ -97,7 +112,7 @@ export async function GET(request: Request) {
         : {}),
     },
     include: { customer: true, vehicle: true },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ closedAt: "desc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json({ success: true, scope: scope || "active", orders: orders.map(formatOrder) });
@@ -116,6 +131,7 @@ export async function POST(request: Request) {
   const partsTotal = parseMoneyToNumber(normalize(formData.get("partsTotal")));
   const servicesTotal = parseMoneyToNumber(normalize(formData.get("servicesTotal")));
   const totalAmount = parseMoneyToNumber(normalize(formData.get("totalAmount")));
+  const mappedStatus = mapStatus(statusText);
 
   if (!customerId || !vehicleId) {
     return NextResponse.json({ success: false, message: "Cliente e veículo são obrigatórios." }, { status: 400 });
@@ -138,12 +154,12 @@ export async function POST(request: Request) {
       customerId,
       vehicleId,
       code,
-      status: mapStatus(statusText),
+      status: mappedStatus,
       description,
       totalParts: partsTotal,
       totalServices: servicesTotal,
       totalAmount,
-      closedAt: finalizedPrismaStatuses.includes(mapStatus(statusText) as any) ? new Date() : null,
+      closedAt: finalizedPrismaStatuses.includes(mappedStatus as any) ? new Date() : null,
     },
     include: { customer: true, vehicle: true },
   });
