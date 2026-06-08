@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { WorkOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
+import { activePrismaStatuses, finalizedPrismaStatuses } from "@/lib/work-order-lifecycle";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -21,7 +22,7 @@ function mapStatus(value: string): WorkOrderStatus {
   if (normalized.includes("pint")) return "PAINTING";
   if (normalized.includes("acab")) return "FINISHING";
   if (normalized.includes("pronto") || normalized.includes("retirada")) return "READY_FOR_PICKUP";
-  if (normalized.includes("entreg")) return "DELIVERED";
+  if (normalized.includes("entreg") || normalized.includes("finaliz") || normalized.includes("conclu")) return "DELIVERED";
   if (normalized.includes("cancel")) return "CANCELED";
   if (normalized.includes("orc") || normalized.includes("orç") || normalized.includes("diagn")) return "QUOTE";
   return "OPEN";
@@ -56,19 +57,33 @@ function formatOrder(order: any) {
     service: order.description || "Atendimento operacional",
     responsibleEmployeeName: "Não definido",
     status: statusLabel(order.status),
+    statusCode: order.status,
     total: formatCurrency(order.totalAmount),
     origin: "Banco",
   };
+}
+
+function scopeStatusFilter(scope: string | null) {
+  if (scope === "history" || scope === "finalized") {
+    return { in: [...finalizedPrismaStatuses] as WorkOrderStatus[] };
+  }
+
+  if (scope === "all") return undefined;
+
+  return { in: [...activePrismaStatuses] as WorkOrderStatus[] };
 }
 
 export async function GET(request: Request) {
   const session = await requireCurrentSession();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
+  const scope = searchParams.get("scope");
+  const statusFilter = scopeStatusFilter(scope);
 
   const orders = await prisma.workOrder.findMany({
     where: {
       companyId: session.companyId,
+      ...(statusFilter ? { status: statusFilter } : {}),
       ...(search
         ? {
             OR: [
@@ -85,7 +100,7 @@ export async function GET(request: Request) {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ success: true, orders: orders.map(formatOrder) });
+  return NextResponse.json({ success: true, scope: scope || "active", orders: orders.map(formatOrder) });
 }
 
 export async function POST(request: Request) {
@@ -128,6 +143,7 @@ export async function POST(request: Request) {
       totalParts: partsTotal,
       totalServices: servicesTotal,
       totalAmount,
+      closedAt: finalizedPrismaStatuses.includes(mapStatus(statusText) as any) ? new Date() : null,
     },
     include: { customer: true, vehicle: true },
   });
