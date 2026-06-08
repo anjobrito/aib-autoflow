@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { ShieldCheck, RefreshCw, Building2, LogOut } from "lucide-react";
+import { ShieldCheck, RefreshCw, Building2, LogOut, UserRoundCog } from "lucide-react";
 
 type AdminCompany = {
   id: string;
@@ -128,6 +128,10 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
+            <a href="/admin/usuarios-ajbsystems" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-black text-white hover:bg-white hover:text-slate-950">
+              <UserRoundCog className="h-4 w-4" />
+              Usuários AJBSYSTEMS
+            </a>
             <button type="button" onClick={loadCompanies} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950">
               <RefreshCw className="h-4 w-4" />
               Atualizar
