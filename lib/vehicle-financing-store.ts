@@ -29,6 +29,9 @@ export type StoredVehicleFinancing = {
   installmentAmount?: string;
   returnPercentage: string;
   returnAmount: string;
+  ilaDiscountPercentage: string;
+  ilaDiscountAmount: string;
+  netReturnAmount: string;
   prestamistaInsuranceAmount: string;
   branchName: string;
   financingStatus: FinancingStatus;
@@ -97,6 +100,55 @@ function writeRecords(records: StoredVehicleFinancing[]) {
   window.localStorage.setItem(storageKey, JSON.stringify(records));
 }
 
+function currencyToNumber(value?: string) {
+  if (!value) return 0;
+  const normalized = value.replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function numberToCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
+}
+
+function percentageToNumber(value?: string) {
+  if (!value) return 0;
+  const normalized = value.replace(/[^0-9,.-]/g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function formatPercentage(value: string | undefined) {
+  const parsed = percentageToNumber(value);
+  if (!parsed) return "0%";
+  return `${String(parsed).replace(".", ",")}%`;
+}
+
+export function calculateIlaDiscountAmount(returnAmount: string, ilaDiscountPercentage: string) {
+  const grossReturn = Math.max(0, currencyToNumber(returnAmount));
+  const ilaPercentage = percentageToNumber(ilaDiscountPercentage);
+  return grossReturn * (ilaPercentage / 100);
+}
+
+export function calculateNetReturnAmount(returnAmount: string, ilaDiscountPercentage: string) {
+  const grossReturn = Math.max(0, currencyToNumber(returnAmount));
+  const ilaDiscount = calculateIlaDiscountAmount(returnAmount, ilaDiscountPercentage);
+  return Math.max(0, grossReturn - ilaDiscount);
+}
+
+export function normalizeVehicleFinancingDraft(financing: VehicleFinancingDraft): VehicleFinancingDraft {
+  const ilaDiscountPercentage = formatPercentage(financing.ilaDiscountPercentage || "0%");
+  const ilaDiscountAmount = numberToCurrency(calculateIlaDiscountAmount(financing.returnAmount, ilaDiscountPercentage));
+  const netReturnAmount = numberToCurrency(calculateNetReturnAmount(financing.returnAmount, ilaDiscountPercentage));
+
+  return {
+    ...financing,
+    ilaDiscountPercentage,
+    ilaDiscountAmount,
+    netReturnAmount,
+  };
+}
+
 export function createEmptyVehicleFinancingDraft(): VehicleFinancingDraft {
   return {
     sellerName: "",
@@ -119,6 +171,9 @@ export function createEmptyVehicleFinancingDraft(): VehicleFinancingDraft {
     installmentAmount: "R$ 0,00",
     returnPercentage: "0%",
     returnAmount: "R$ 0,00",
+    ilaDiscountPercentage: "0%",
+    ilaDiscountAmount: "R$ 0,00",
+    netReturnAmount: "R$ 0,00",
     prestamistaInsuranceAmount: "R$ 0,00",
     branchName: "Matriz",
     financingStatus: "EM_ANALISE",
@@ -146,13 +201,15 @@ export function listVehicleFinancings() {
 
 export function saveVehicleFinancing(financing: VehicleFinancingDraft) {
   const timestamp = new Date().toISOString();
-  const record: StoredVehicleFinancing = { ...financing, id: crypto.randomUUID(), createdAt: timestamp, updatedAt: timestamp };
+  const normalized = normalizeVehicleFinancingDraft(financing);
+  const record: StoredVehicleFinancing = { ...normalized, id: crypto.randomUUID(), createdAt: timestamp, updatedAt: timestamp };
   writeRecords([record, ...readRecords()]);
   return record;
 }
 
 export function updateVehicleFinancing(id: string, financing: VehicleFinancingDraft) {
-  const updated = readRecords().map((item) => item.id === id ? { ...item, ...financing, updatedAt: new Date().toISOString() } : item);
+  const normalized = normalizeVehicleFinancingDraft(financing);
+  const updated = readRecords().map((item) => item.id === id ? { ...item, ...normalized, updatedAt: new Date().toISOString() } : item);
   writeRecords(updated);
   return updated.find((item) => item.id === id);
 }
