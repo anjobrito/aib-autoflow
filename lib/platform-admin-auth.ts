@@ -111,6 +111,13 @@ export async function requireBillingPlatformAdmin() {
   return session;
 }
 
+export async function requireMasterPlatformAdmin() {
+  const session = await getCurrentPlatformAdminSession();
+  if (!session) throw new Error("Unauthorized");
+  if (session.admin.role !== "MASTER") throw new Error("Forbidden");
+  return session;
+}
+
 export async function destroyCurrentPlatformAdminSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(adminSessionCookieName)?.value;
