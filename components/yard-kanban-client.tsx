@@ -16,7 +16,7 @@ type KanbanCard = {
   service: string;
   status: string;
   total: string;
-  source: "storage" | "demo";
+  source: "storage";
 };
 
 type KanbanColumn = {
@@ -48,18 +48,6 @@ function buildColumns(statuses: string[]): KanbanColumn[] {
   }));
 }
 
-function buildDemoCards(statuses: string[]): KanbanCard[] {
-  const activeStatuses = statuses.filter((status) => !isFinalizedWorkOrderStatus(status));
-  const statusAt = (index: number) => activeStatuses[Math.min(index, Math.max(activeStatuses.length - 1, 0))] ?? "Entrada";
-
-  return [
-    { id: "demo-yard-001", code: "OS-1024", customer: "João Pereira", vehicle: "ABC1D23 - Honda Civic", service: "Revisão preventiva", status: statusAt(1), total: "R$ 380,00", source: "demo" },
-    { id: "demo-yard-002", code: "OS-1025", customer: "Maria Souza", vehicle: "BRA2E44 - Fiat Argo", service: "Diagnóstico de suspensão", status: statusAt(2), total: "R$ 640,00", source: "demo" },
-    { id: "demo-yard-003", code: "OS-1026", customer: "Carlos Lima", vehicle: "CAR9F10 - VW Gol", service: "Controle de qualidade", status: statusAt(3), total: "R$ 180,00", source: "demo" },
-    { id: "demo-yard-004", code: "OS-1027", customer: "Ana Martins", vehicle: "AIB7S20 - Chevrolet Onix", service: "Entrada para orçamento", status: statusAt(0), total: "R$ 0,00", source: "demo" },
-  ];
-}
-
 export function YardKanbanClient() {
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
   const [orders, setOrders] = useState<KanbanCard[]>([]);
@@ -77,13 +65,12 @@ export function YardKanbanClient() {
   function refresh() {
     const company = getCompany();
     const nextProfile = getBusinessProfileByLabel(company.businessType || "Completo / Multioperação");
-    const statuses = nextProfile.kanbanStatuses.length > 0 ? nextProfile.kanbanStatuses : fallbackStatuses;
     const stored = filterWorkOrdersByBusinessProfile(listWorkOrders(), nextProfile)
       .filter((order) => !isFinalizedWorkOrderStatus(order.status))
       .map(normalizeOrder);
 
     setBusinessType(nextProfile.label);
-    setOrders(stored.length > 0 ? stored : buildDemoCards(statuses));
+    setOrders(stored);
   }
 
   useEffect(() => {
@@ -136,9 +123,7 @@ export function YardKanbanClient() {
     const draggedCard = orders.find((order) => order.id === draggingCardId);
     if (!draggedCard) return;
 
-    if (draggedCard.source === "storage") {
-      updateWorkOrderStatus(draggingCardId, status);
-    }
+    updateWorkOrderStatus(draggingCardId, status);
 
     if (isFinalizedWorkOrderStatus(status)) {
       setOrders((current) => current.filter((order) => order.id !== draggingCardId));
@@ -213,12 +198,20 @@ export function YardKanbanClient() {
                     <div className="mt-4 rounded-2xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Cliente</p><p className="font-bold text-slate-950">{card.customer}</p></div>
                     <p className="mt-3 text-sm font-black text-blue-700">{card.total}</p>
                   </div>
-                )) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-sm text-slate-500">Solte cards aqui ou avance itens para esta etapa.</div>}
+                )) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-sm text-slate-500">Nenhuma OS nesta etapa.</div>}
               </div>
             </section>
           ))}
         </div>
       </div>
+
+      {totalInYard === 0 ? (
+        <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+          <p className="text-lg font-black text-slate-950">Nenhuma OS ativa no pátio</p>
+          <p className="mt-2 text-sm text-slate-600">Crie uma nova OS ou consulte entregas/finalizações no histórico.</p>
+          <Link href="/ordens-servico" className="mt-5 inline-flex rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700">Abrir ordens de serviço</Link>
+        </div>
+      ) : null}
 
       {finalizerColumns.length > 0 ? (
         <section className="rounded-3xl bg-slate-950 p-5 text-white shadow-sm">
