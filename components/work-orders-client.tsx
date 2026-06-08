@@ -8,6 +8,8 @@ import { NewWorkOrderForm } from "@/components/new-work-order-form";
 import { getCompany } from "@/lib/browser-store";
 import { BusinessProfile, getBusinessProfileByLabel } from "@/lib/business-types";
 
+const finalizedLabels = ["Entregue", "Finalizado", "Finalizada", "Cancelado", "Cancelada", "Faturado", "Concluído", "Concluída"];
+
 type OperationRow = {
   id: string;
   code: string;
@@ -24,7 +26,7 @@ const demoOperationsByProfile: Record<BusinessProfile["id"], OperationRow[]> = {
   COMPLETO: [
     { id: "demo-completo-1", code: "OP-1024", customer: "João Pereira", vehicle: "Honda Civic", service: "Revisão e higienização", responsibleEmployeeName: "Marcos", status: "Em atendimento", total: "R$ 318,00", origin: "Modelo" },
     { id: "demo-completo-2", code: "OP-1025", customer: "Maria Souza", vehicle: "Fiat Argo", service: "Preparação operacional", responsibleEmployeeName: "Carla", status: "Aguardando", total: "R$ 540,00", origin: "Modelo" },
-    { id: "demo-completo-3", code: "OP-1026", customer: "Carlos Lima", vehicle: "VW Gol", service: "Atendimento completo", responsibleEmployeeName: "Rafael", status: "Pronto", total: "R$ 270,00", origin: "Modelo" },
+    { id: "demo-completo-3", code: "OP-1026", customer: "Carlos Lima", vehicle: "VW Gol", service: "Atendimento final", responsibleEmployeeName: "Rafael", status: "Pronto", total: "R$ 270,00", origin: "Modelo" },
   ],
   OFICINA: [
     { id: "demo-oficina-1", code: "OS-1024", customer: "João Pereira", vehicle: "Honda Civic", service: "Troca de óleo", responsibleEmployeeName: "Marcos", status: "Em andamento", total: "R$ 238,00", origin: "Modelo" },
@@ -54,17 +56,22 @@ const demoOperationsByProfile: Record<BusinessProfile["id"], OperationRow[]> = {
   REVENDEDORA: [
     { id: "demo-revenda-1", code: "PV-1024", customer: "João Pereira", vehicle: "Honda Civic", service: "Preparação para venda", responsibleEmployeeName: "Marcos", status: "Preparação", total: "R$ 850,00", origin: "Modelo" },
     { id: "demo-revenda-2", code: "PV-1025", customer: "Maria Souza", vehicle: "Fiat Argo", service: "Negociação em andamento", responsibleEmployeeName: "Carla", status: "Em negociação", total: "R$ 58.900,00", origin: "Modelo" },
-    { id: "demo-revenda-3", code: "PV-1026", customer: "Carlos Lima", vehicle: "VW Gol", service: "Documentação e gravame", responsibleEmployeeName: "Rafael", status: "Documentação", total: "R$ 34.500,00", origin: "Modelo" },
+    { id: "demo-revenda-3", code: "PV-1026", customer: "Carlos Lima", vehicle: "VW Gol", service: "Documentação", responsibleEmployeeName: "Rafael", status: "Documentação", total: "R$ 34.500,00", origin: "Modelo" },
   ],
   AUTOPECAS: [
     { id: "demo-autopecas-1", code: "PV-1024", customer: "João Pereira", vehicle: "Retirada balcão", service: "Pedido de filtros", responsibleEmployeeName: "Bruno", status: "Separação", total: "R$ 128,00", origin: "Modelo" },
     { id: "demo-autopecas-2", code: "PV-1025", customer: "Maria Souza", vehicle: "Entrega local", service: "Venda de bateria", responsibleEmployeeName: "Carla", status: "Aguardando pagamento", total: "R$ 420,00", origin: "Modelo" },
-    { id: "demo-autopecas-3", code: "PV-1026", customer: "Carlos Lima", vehicle: "Pedido online", service: "Separação de peças", responsibleEmployeeName: "Bruno", status: "Faturado", total: "R$ 260,00", origin: "Modelo" },
+    { id: "demo-autopecas-3", code: "PV-1026", customer: "Carlos Lima", vehicle: "Pedido online", service: "Separação de peças", responsibleEmployeeName: "Bruno", status: "Separação final", total: "R$ 260,00", origin: "Modelo" },
   ],
 };
 
 function normalize(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function isFinalizedLabel(status: string) {
+  const normalized = normalize(status);
+  return finalizedLabels.some((label) => normalize(label) === normalized);
 }
 
 function getDemoOperationsForProfile(profile: BusinessProfile) {
@@ -83,8 +90,9 @@ export function WorkOrdersClient() {
     setMessage("");
 
     try {
-      const query = searchTerm.trim() ? `?search=${encodeURIComponent(searchTerm.trim())}` : "";
-      const response = await fetch(`/api/work-orders${query}`, { cache: "no-store" });
+      const params = new URLSearchParams({ scope: "active" });
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      const response = await fetch(`/api/work-orders?${params.toString()}`, { cache: "no-store" });
       const result = await response.json();
 
       if (!response.ok || !result.success) throw new Error(result.message || "Work orders API unavailable");
@@ -110,7 +118,7 @@ export function WorkOrdersClient() {
   const profile = useMemo(() => getBusinessProfileByLabel(businessType), [businessType]);
 
   const rows = useMemo(() => {
-    const visibleRows = orders.length > 0 || !message ? orders : getDemoOperationsForProfile(profile);
+    const visibleRows = orders.length > 0 || !message ? orders : getDemoOperationsForProfile(profile).filter((row) => !isFinalizedLabel(row.status));
     if (!searchTerm.trim()) return visibleRows;
     const term = normalize(searchTerm);
     return visibleRows.filter((row) => normalize(`${row.code} ${row.customer} ${row.vehicle} ${row.service} ${row.status} ${row.total} ${row.origin}`).includes(term));
@@ -141,7 +149,7 @@ export function WorkOrdersClient() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {profile.kanbanStatuses.map((status) => (
+              {profile.kanbanStatuses.filter((status) => !isFinalizedLabel(status)).map((status) => (
                 <span key={status} className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700 shadow-sm">{status}</span>
               ))}
             </div>
@@ -157,18 +165,18 @@ export function WorkOrdersClient() {
 
       <div className="rounded-3xl bg-white p-4 shadow-sm">
         <label className="grid gap-2 text-sm font-bold text-slate-700">
-          Buscar fluxo operacional
+          Buscar fluxo operacional ativo
           <span className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-blue-500 focus-within:bg-white">
             <Search className="h-4 w-4 text-slate-400" />
-            <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} onBlur={() => refresh()} placeholder="Busque por código, cliente, veículo, serviço, status ou total" className="w-full bg-transparent font-medium outline-none" />
+            <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} onBlur={() => refresh()} placeholder="Busca somente OS ativas. Finalizadas ficam no histórico." className="w-full bg-transparent font-medium outline-none" />
           </span>
         </label>
       </div>
 
       <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
         <div className="border-b border-slate-100 p-6">
-          <h2 className="text-xl font-black text-slate-950">{profile.operationPluralLabel}</h2>
-          <p className="mt-2 text-sm text-slate-600">Lista operacional gravada por empresa no PostgreSQL. Cadastros novos abrem em lightbox para manter a tela limpa.</p>
+          <h2 className="text-xl font-black text-slate-950">{profile.operationPluralLabel} ativos</h2>
+          <p className="mt-2 text-sm text-slate-600">OS entregues, finalizadas, faturadas ou canceladas saem desta tela e ficam no histórico para conferência.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] text-left text-sm">
@@ -193,6 +201,7 @@ export function WorkOrdersClient() {
                   <td className="px-5 py-4"><Link href={`/ordens-servico/${row.id}`} className="font-black text-blue-700 hover:text-blue-900">Abrir</Link></td>
                 </tr>
               ))}
+              {rows.length === 0 ? <tr><td colSpan={9} className="px-5 py-10 text-center text-slate-500">Nenhuma OS ativa. Consulte finalizadas no histórico.</td></tr> : null}
             </tbody>
           </table>
         </div>
