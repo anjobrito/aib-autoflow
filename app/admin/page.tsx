@@ -2,6 +2,17 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ShieldCheck, RefreshCw, Building2, LogOut, UserRoundCog } from "lucide-react";
+import { AdminCommercialSummary } from "@/components/admin-commercial-summary";
+
+type AdminSummary = {
+  total: number;
+  active: number;
+  trial: number;
+  pastDue: number;
+  canceled: number;
+  blocked: number;
+  monthlyRevenueCents: number;
+};
 
 type AdminCompany = {
   id: string;
@@ -39,6 +50,7 @@ type AdminCompany = {
   };
 };
 
+const emptySummary: AdminSummary = { total: 0, active: 0, trial: 0, pastDue: 0, canceled: 0, blocked: 0, monthlyRevenueCents: 0 };
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
 const labelClass = "grid gap-2 text-sm font-bold text-slate-700";
 const subscriptionStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED", "BLOCKED"];
@@ -60,6 +72,7 @@ function dateInputValue(value?: string | null) {
 
 export default function AdminPage() {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
+  const [summary, setSummary] = useState<AdminSummary>(emptySummary);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -79,6 +92,7 @@ export default function AdminPage() {
     }
 
     setCompanies(result.companies || []);
+    setSummary(result.summary || emptySummary);
   }
 
   useEffect(() => {
@@ -153,6 +167,8 @@ export default function AdminPage() {
             Usuários de oficina entram pelo AJB AutoFlow em /entrar e usam roles próprias da empresa cliente.
           </p>
         </div>
+
+        <AdminCommercialSummary summary={summary} />
 
         {message ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">{message}</div> : null}
         {loading ? <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600">Carregando empresas...</div> : null}
