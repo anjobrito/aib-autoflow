@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Car, ClipboardList, RefreshCw, Search, ShieldCheck, Wrench } from "lucide-react";
 import { listInspections, listVehicles, listWorkOrders, StoredInspection, StoredVehicle, StoredWorkOrder } from "@/lib/browser-store";
-import { demoVehicles, demoWorkOrders } from "@/lib/demo-data";
 import { isFinalizedWorkOrderStatus } from "@/lib/work-order-lifecycle";
 
 type HistoryRow = {
@@ -69,24 +68,6 @@ function buildStoredHistory(order: StoredWorkOrder, vehicles: StoredVehicle[]): 
   };
 }
 
-function buildDemoHistory(): HistoryRow[] {
-  return demoWorkOrders.map((order) => ({
-    id: order.id,
-    code: order.code,
-    plate: order.plate,
-    customer: order.customer,
-    vehicle: `${order.plate} - ${order.vehicle}`,
-    powertrain: "Não informado",
-    service: order.service,
-    product: "Produto demo",
-    responsibleEmployeeName: "Não definido",
-    status: order.status,
-    total: order.total,
-    totalAmount: parseCurrency(order.total),
-    source: "Demo",
-  }));
-}
-
 export function VehicleHistoryClient() {
   const [query, setQuery] = useState("");
   const [vehicles, setVehicles] = useState<StoredVehicle[]>([]);
@@ -110,7 +91,7 @@ export function VehicleHistoryClient() {
       setDatabaseHistory(result.orders || []);
     } catch {
       setDatabaseHistory([]);
-      setMessage("Banco/API indisponível ou sessão expirada. Exibindo histórico local/demo quando existir.");
+      setMessage("Banco/API indisponível ou sessão expirada. Entre novamente para consultar o histórico real.");
     } finally {
       setLoading(false);
     }
@@ -142,16 +123,8 @@ export function VehicleHistoryClient() {
       powertrain: item.powertrain || "Não informado",
     }));
 
-    const demo = demoVehicles.map((vehicle) => ({
-      plate: vehicle.plate,
-      model: vehicle.model,
-      customer: vehicle.customer,
-      mileage: vehicle.mileage,
-      powertrain: "Não informado",
-    }));
-
     const unique = new Map<string, VehicleMatch>();
-    [...stored, ...fromHistory, ...demo].forEach((vehicle) => {
+    [...stored, ...fromHistory].forEach((vehicle) => {
       const key = normalizePlate(vehicle.plate);
       if (key && !unique.has(key)) unique.set(key, vehicle);
     });
@@ -166,7 +139,7 @@ export function VehicleHistoryClient() {
       .filter((order) => isFinalizedWorkOrderStatus(order.status))
       .map((order) => buildStoredHistory(order, vehicles));
 
-    const all = [...databaseHistory, ...storedHistory, ...buildDemoHistory()];
+    const all = [...databaseHistory, ...storedHistory];
     const unique = new Map<string, HistoryRow>();
     all.forEach((item) => unique.set(`${item.source}-${item.id}`, item));
 
@@ -232,6 +205,7 @@ export function VehicleHistoryClient() {
               <p className="mt-1 text-sm text-slate-600">Propulsão: {vehicle.powertrain}</p>
             </div>
           ))}
+          {vehicleMatches.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 md:col-span-2 xl:col-span-3">Nenhum veículo encontrado.</div> : null}
         </div>
       </div>
 
