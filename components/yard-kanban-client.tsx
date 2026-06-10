@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { DragEvent, useEffect, useMemo, useState } from "react";
 import { Car, Clock, ClipboardList, Move } from "lucide-react";
-import { getCompany, listWorkOrders, StoredWorkOrder, updateWorkOrderStatus } from "@/lib/browser-store";
-import { filterWorkOrdersByBusinessProfile } from "@/lib/business-profile-work-orders";
+import { getCompany } from "@/lib/browser-store";
 import { getBusinessProfileByLabel } from "@/lib/business-types";
 import { isFinalizedWorkOrderStatus } from "@/lib/work-order-lifecycle";
 
@@ -16,7 +15,7 @@ type KanbanCard = {
   service: string;
   status: string;
   total: string;
-  source: "storage";
+  source: "database";
 };
 
 type KanbanColumn = {
@@ -26,19 +25,6 @@ type KanbanColumn = {
 };
 
 const fallbackStatuses = ["Entrada", "Em atendimento", "Aguardando", "Pronto", "Entregue", "Finalizado"];
-
-function normalizeOrder(order: StoredWorkOrder): KanbanCard {
-  return {
-    id: order.id,
-    code: order.code,
-    customer: order.customer,
-    vehicle: order.vehicle,
-    service: order.service,
-    status: order.status,
-    total: order.total,
-    source: "storage",
-  };
-}
 
 function buildColumns(statuses: string[]): KanbanColumn[] {
   return statuses.map((status) => ({
@@ -54,6 +40,7 @@ export function YardKanbanClient() {
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const profile = useMemo(() => getBusinessProfileByLabel(businessType), [businessType]);
   const columns = useMemo(() => buildColumns(profile.kanbanStatuses.length > 0 ? profile.kanbanStatuses : fallbackStatuses), [profile.kanbanStatuses]);
@@ -62,24 +49,29 @@ export function YardKanbanClient() {
   const firstStatus = activeColumns[0]?.status ?? fallbackStatuses[0];
   const readyStatus = activeColumns[Math.max(activeColumns.length - 1, 0)]?.status ?? "Pronto";
 
-  function refresh() {
-    const company = getCompany();
-    const nextProfile = getBusinessProfileByLabel(company.businessType || "Completo / Multioperação");
-    const stored = filterWorkOrdersByBusinessProfile(listWorkOrders(), nextProfile)
-      .filter((order) => !isFinalizedWorkOrderStatus(order.status))
-      .map(normalizeOrder);
+  async function refresh() {
+    setBusinessType(getCompany().businessType || "Completo / Multioperação");
+    setLoading(true);
+    setMessage("");
 
-    setBusinessType(nextProfile.label);
-    setOrders(stored);
+    try {
+      const response = await fetch("/api/work-orders?scope=active", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || "Não foi possível carregar o pátio.");
+      setOrders((result.orders || []).map((order: KanbanCard) => ({ ...order, source: "database" })));
+    } catch {
+      setOrders([]);
+      setMessage("Não foi possível carregar o pátio do banco. Entre novamente ou verifique a conexão.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     refresh();
-    window.addEventListener("storage", refresh);
     window.addEventListener("ajb-company-updated", refresh);
 
     return () => {
-      window.removeEventListener("storage", refresh);
       window.removeEventListener("ajb-company-updated", refresh);
     };
   }, []);
@@ -116,25 +108,45 @@ export function YardKanbanClient() {
     setDragOverStatus(status);
   }
 
-  function handleDrop(event: DragEvent<HTMLElement>, status: string) {
+  async function persistStatus(card: KanbanCard, status: string) {
+    const formData = new FormData();
+    formData.set("status", status);
+
+    const response = await fetch(`/api/work-orders/${card.id}/status`, {
+      method: "PATCH",
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.message || "Não foi possível atualizar a OS.");
+    return result;
+  }
+
+  async function handleDrop(event: DragEvent<HTMLElement>, status: string) {
     event.preventDefault();
     if (!draggingCardId) return;
 
     const draggedCard = orders.find((order) => order.id === draggingCardId);
     if (!draggedCard) return;
 
-    updateWorkOrderStatus(draggingCardId, status);
-
-    if (isFinalizedWorkOrderStatus(status)) {
-      setOrders((current) => current.filter((order) => order.id !== draggingCardId));
-      setMessage(`${draggedCard.code} saiu do pátio e ficou disponível no histórico.`);
-    } else {
-      setOrders((current) => current.map((order) => order.id === draggingCardId ? { ...order, status } : order));
-      setMessage("");
-    }
-
     setDraggingCardId(null);
     setDragOverStatus(null);
+
+    try {
+      const result = await persistStatus(draggedCard, status);
+
+      if (result.finalized || isFinalizedWorkOrderStatus(status)) {
+        setOrders((current) => current.filter((order) => order.id !== draggingCardId));
+        setMessage(`${draggedCard.code} saiu do pátio e ficou disponível no histórico.`);
+        return;
+      }
+
+      setOrders((current) => current.map((order) => order.id === draggingCardId ? { ...order, status: result.order?.status || status } : order));
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível atualizar o status da OS.");
+      await refresh();
+    }
   }
 
   return (
@@ -154,13 +166,14 @@ export function YardKanbanClient() {
         </div>
       </div>
 
-      {message ? <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{message}</div> : null}
+      {loading ? <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600">Carregando pátio do banco...</div> : null}
+      {message ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">{message}</div> : null}
 
       <section className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
         <p className="text-sm font-black uppercase tracking-wide text-blue-700">Kanban operacional</p>
         <h2 className="mt-1 text-xl font-black text-slate-950">{profile.kanbanLabel}</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          O pátio mostra somente OS ativas. Ao mover para entrega, finalização, cancelamento ou faturamento, o card sai do pátio e fica disponível no histórico para conferência.
+          O pátio mostra somente OS ativas gravadas no banco. Ao mover para entrega, finalização, cancelamento ou faturamento, o card sai do pátio e fica disponível no histórico.
         </p>
       </section>
 
