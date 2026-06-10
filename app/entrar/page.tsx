@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { ArrowRight, Gauge } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { AlertTriangle, ArrowRight, Gauge, HelpCircle, X } from "lucide-react";
 
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
 
@@ -16,9 +16,17 @@ async function readJsonResponse(response: Response) {
   }
 }
 
+function isBlockedMessage(message: string) {
+  const lower = message.toLowerCase();
+  return lower.includes("bloqueada") || lower.includes("cancelada") || lower.includes("assinatura") || lower.includes("pagamento") || lower.includes("licença") || lower.includes("licenca");
+}
+
 export default function EntrarPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const shouldShowHelp = useMemo(() => isBlockedMessage(message), [message]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,13 +82,61 @@ export default function EntrarPage() {
             <label className="grid gap-2 text-sm font-bold text-slate-700">Senha<input name="password" type="password" required autoComplete="current-password" placeholder="Sua senha" className={inputClass} /></label>
           </div>
 
-          {message ? <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{message}</div> : null}
+          {message ? (
+            <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>{message}</span>
+                {shouldShowHelp ? (
+                  <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-red-700 shadow-sm hover:bg-red-100">
+                    <HelpCircle className="h-4 w-4" />
+                    Precisa de ajuda?
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <button disabled={loading} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60">
             {loading ? "Entrando..." : "Entrar"} <ArrowRight className="h-4 w-4" />
           </button>
         </form>
       </section>
+
+      {helpOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-8">
+          <div className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-2xl md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><AlertTriangle className="h-6 w-6" /></div>
+                <div>
+                  <p className="text-sm font-black uppercase tracking-wide text-amber-700">Acesso bloqueado</p>
+                  <h2 className="text-2xl font-black text-slate-950">Regularize a assinatura</h2>
+                </div>
+              </div>
+              <button type="button" onClick={() => setHelpOpen(false)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="mt-6 grid gap-4 text-sm leading-6 text-slate-700">
+              <p>O acesso da empresa está bloqueado porque a assinatura está vencida, cancelada ou aguardando confirmação de pagamento.</p>
+              <div className="rounded-3xl bg-slate-50 p-5">
+                <p className="font-black text-slate-950">O que fazer agora?</p>
+                <ol className="mt-3 grid list-decimal gap-2 pl-5">
+                  <li>Entre em contato com o responsável financeiro da sua empresa ou com a AJBSYSTEMS.</li>
+                  <li>Regularize o pagamento da assinatura.</li>
+                  <li>Após a confirmação, o acesso será liberado automaticamente ou pela administração da plataforma.</li>
+                  <li>Tente entrar novamente após a liberação.</li>
+                </ol>
+              </div>
+              <p className="rounded-2xl bg-blue-50 px-4 py-3 font-bold text-blue-700">Em caso de pagamento recente, aguarde a confirmação ou envie o comprovante para acelerar a liberação.</p>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a href="/licenca" className="inline-flex flex-1 justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700">Ver instruções de licença</a>
+              <button type="button" onClick={() => setHelpOpen(false)} className="inline-flex flex-1 justify-center rounded-2xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Fechar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
