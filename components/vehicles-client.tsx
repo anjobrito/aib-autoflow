@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search } from "lucide-react";
 import { UiModal } from "@/components/ui-modal";
-import { demoVehicles } from "@/lib/demo-data";
 import { vehicleBrands, vehiclePowertrains } from "@/lib/select-options";
 
 type CustomerOption = {
@@ -99,23 +98,7 @@ export function VehiclesClient() {
       await refreshCustomers();
       await refreshVehicles();
     } catch {
-      const fallbackRows = demoVehicles.map((vehicle) => ({
-        id: `demo-${vehicle.plate}`,
-        customerId: null,
-        plate: vehicle.plate,
-        brand: "",
-        model: vehicle.model,
-        year: null,
-        color: null,
-        mileage: null,
-        powertrain: "Não informado",
-        customerName: vehicle.customer,
-        customerPhone: null,
-        status: "Modelo",
-        editable: false,
-      }));
-
-      setVehicles(fallbackRows);
+      setVehicles([]);
       setCustomers([]);
       setMessage("Banco/API indisponível, nenhum cliente cadastrado ou sessão expirada. Entre novamente e cadastre clientes antes de vincular veículos.");
     }
@@ -182,7 +165,7 @@ export function VehiclesClient() {
         <div>
           <p className="text-sm font-black uppercase tracking-wide text-blue-700">Cadastro</p>
           <h2 className="mt-1 text-2xl font-black text-slate-950">Veículos cadastrados</h2>
-          <p className="mt-2 text-sm text-slate-600">Veículos reais agora são gravados por empresa no PostgreSQL e vinculados a clientes do mesmo tenant.</p>
+          <p className="mt-2 text-sm text-slate-600">Veículos reais são gravados por empresa no PostgreSQL e vinculados a clientes do mesmo tenant.</p>
         </div>
         <button type="button" onClick={openCreateModal} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700">
           <Plus className="h-4 w-4" />
@@ -229,14 +212,11 @@ export function VehiclesClient() {
                   <td className="px-5 py-4 text-slate-700">{row.powertrain || "Não informado"}</td>
                   <td className="px-5 py-4 text-slate-700">{row.status}</td>
                   <td className="px-5 py-4">
-                    {row.editable ? (
-                      <button type="button" onClick={() => openEditModal(row)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50"><Pencil className="h-3.5 w-3.5" />Editar</button>
-                    ) : (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Modelo</span>
-                    )}
+                    <button type="button" onClick={() => openEditModal(row)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50"><Pencil className="h-3.5 w-3.5" />Editar</button>
                   </td>
                 </tr>
               ))}
+              {rows.length === 0 ? <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-500">Nenhum veículo cadastrado nesta empresa.</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -245,20 +225,14 @@ export function VehiclesClient() {
       <UiModal open={isFormOpen} title={modalTitle} description={modalDescription} onClose={closeModal}>
         <form key={editingVehicle?.id ?? "new-vehicle"} onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-2">
-            <label className={labelClass}>
-              Cliente
-              <select required name="customerId" defaultValue={editingVehicle?.customerId ?? ""} className={inputClass}>
-                <option value="" disabled>Selecione um cliente</option>
-                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-              </select>
-            </label>
-            <label className={labelClass}>Placa<input required name="plate" value={plate} onChange={(event) => setPlate(event.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" placeholder="Ex: ABC1D23" className={`${inputClass} uppercase`} /></label>
+            <label className={labelClass}>Cliente<select required name="customerId" defaultValue={editingVehicle?.customerId ?? ""} className={inputClass}><option value="" disabled>Selecione um cliente</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+            <label className={labelClass}>Placa<input required name="plate" value={plate} onChange={(event) => setPlate(event.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" placeholder="Placa do veículo" className={`${inputClass} uppercase`} /></label>
             <label className={labelClass}>Marca<select name="brand" defaultValue={editingVehicle?.brand ?? vehicleBrands[0]} className={inputClass}>{vehicleBrands.map((brand) => <option key={brand}>{brand}</option>)}</select></label>
             <label className={labelClass}>Tipo de propulsão<select name="powertrain" defaultValue={editingVehicle?.powertrain ?? vehiclePowertrains[0]} className={inputClass}>{vehiclePowertrains.map((powertrain) => <option key={powertrain}>{powertrain}</option>)}</select></label>
-            <label className={labelClass}>Modelo<input required name="model" defaultValue={editingVehicle?.model ?? ""} placeholder="Ex: Civic, Dolphin, Model 3" className={inputClass} /></label>
-            <label className={labelClass}>Ano<input name="year" defaultValue={editingVehicle?.year ?? ""} inputMode="numeric" placeholder="Ex: 2024" className={inputClass} /></label>
-            <label className={labelClass}>Quilometragem<input name="mileage" defaultValue={editingVehicle?.mileage ?? ""} inputMode="numeric" placeholder="Ex: 82450" className={inputClass} /></label>
-            <label className={labelClass}>Cor<input name="color" defaultValue={editingVehicle?.color ?? ""} placeholder="Ex: Preto" className={inputClass} /></label>
+            <label className={labelClass}>Modelo<input required name="model" defaultValue={editingVehicle?.model ?? ""} placeholder="Modelo do veículo" className={inputClass} /></label>
+            <label className={labelClass}>Ano<input name="year" defaultValue={editingVehicle?.year ?? ""} inputMode="numeric" placeholder="Ano" className={inputClass} /></label>
+            <label className={labelClass}>Quilometragem<input name="mileage" defaultValue={editingVehicle?.mileage ?? ""} inputMode="numeric" placeholder="Quilometragem" className={inputClass} /></label>
+            <label className={labelClass}>Cor<input name="color" defaultValue={editingVehicle?.color ?? ""} placeholder="Cor" className={inputClass} /></label>
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" onClick={closeModal} className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Cancelar</button>
