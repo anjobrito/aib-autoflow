@@ -100,14 +100,14 @@ function writeRecords(records: StoredVehicleFinancing[]) {
   window.localStorage.setItem(storageKey, JSON.stringify(records));
 }
 
-function currencyToNumber(value?: string) {
+export function currencyToNumber(value?: string) {
   if (!value) return 0;
   const normalized = value.replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function numberToCurrency(value: number) {
+export function numberToCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 }
 
@@ -124,6 +124,12 @@ function formatPercentage(value: string | undefined) {
   return `${String(parsed).replace(".", ",")}%`;
 }
 
+export function calculateGrossReturnAmount(financedAmount: string, returnPercentage: string) {
+  const financed = Math.max(0, currencyToNumber(financedAmount));
+  const percentage = percentageToNumber(returnPercentage);
+  return financed * (percentage / 100);
+}
+
 export function calculateIlaDiscountAmount(returnAmount: string, ilaDiscountPercentage: string) {
   const grossReturn = Math.max(0, currencyToNumber(returnAmount));
   const ilaPercentage = percentageToNumber(ilaDiscountPercentage);
@@ -137,12 +143,16 @@ export function calculateNetReturnAmount(returnAmount: string, ilaDiscountPercen
 }
 
 export function normalizeVehicleFinancingDraft(financing: VehicleFinancingDraft): VehicleFinancingDraft {
+  const returnPercentage = formatPercentage(financing.returnPercentage || "0%");
+  const returnAmount = numberToCurrency(calculateGrossReturnAmount(financing.financedAmount, returnPercentage));
   const ilaDiscountPercentage = formatPercentage(financing.ilaDiscountPercentage || "0%");
-  const ilaDiscountAmount = numberToCurrency(calculateIlaDiscountAmount(financing.returnAmount, ilaDiscountPercentage));
-  const netReturnAmount = numberToCurrency(calculateNetReturnAmount(financing.returnAmount, ilaDiscountPercentage));
+  const ilaDiscountAmount = numberToCurrency(calculateIlaDiscountAmount(returnAmount, ilaDiscountPercentage));
+  const netReturnAmount = numberToCurrency(calculateNetReturnAmount(returnAmount, ilaDiscountPercentage));
 
   return {
     ...financing,
+    returnPercentage,
+    returnAmount,
     ilaDiscountPercentage,
     ilaDiscountAmount,
     netReturnAmount,
@@ -171,7 +181,7 @@ export function createEmptyVehicleFinancingDraft(): VehicleFinancingDraft {
     installmentAmount: "R$ 0,00",
     returnPercentage: "0%",
     returnAmount: "R$ 0,00",
-    ilaDiscountPercentage: "0%",
+    ilaDiscountPercentage: "26%",
     ilaDiscountAmount: "R$ 0,00",
     netReturnAmount: "R$ 0,00",
     prestamistaInsuranceAmount: "R$ 0,00",
