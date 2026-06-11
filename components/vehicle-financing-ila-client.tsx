@@ -31,11 +31,12 @@ export function VehicleFinancingClient() {
   useEffect(() => { refresh(); }, []);
 
   function updateField<K extends keyof VehicleFinancingDraft>(field: K, value: VehicleFinancingDraft[K]) {
-    if (field === "returnAmount" || field === "ilaDiscountPercentage") {
-      setForm((current) => normalizeVehicleFinancingDraft({ ...current, [field]: value }));
+    const next = { ...form, [field]: value };
+    if (["financedAmount", "returnPercentage", "ilaDiscountPercentage"].includes(String(field))) {
+      setForm(normalizeVehicleFinancingDraft(next));
       return;
     }
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm(next);
   }
 
   function closeForm() {
@@ -97,7 +98,7 @@ export function VehicleFinancingClient() {
         <div>
           <p className="text-sm font-black uppercase tracking-wide text-blue-700">Revenda</p>
           <h2 className="mt-1 text-2xl font-black">Financiamentos e Gravames</h2>
-          <p className="mt-2 text-sm text-slate-600">Controle retorno bruto, desconto ILA e retorno liquido automaticamente.</p>
+          <p className="mt-2 text-sm text-slate-600">Informe valor financiado, % de retorno e % ILA. O sistema calcula retorno bruto, desconto e retorno liquido automaticamente.</p>
         </div>
         <button type="button" onClick={() => { setForm(createEmptyVehicleFinancingDraft()); setEditingId(null); setIsFormOpen(true); }} className="rounded-2xl bg-blue-600 px-6 py-4 text-sm font-black text-white hover:bg-blue-700">Novo financiamento</button>
       </div>
@@ -119,9 +120,21 @@ export function VehicleFinancingClient() {
         </div>
       </div>
 
-      <UiModal open={isFormOpen} title={editingId ? "Editar financiamento" : "Novo financiamento/gravame"} description="Ao informar o retorno bruto e o percentual de ILA, o desconto e o retorno liquido sao calculados automaticamente." onClose={closeForm}>
+      <UiModal open={isFormOpen} title={editingId ? "Editar financiamento" : "Novo financiamento/gravame"} description="Cálculo automático: valor financiado x % retorno = retorno bruto; retorno bruto x % ILA = desconto; retorno bruto - ILA = retorno líquido." onClose={closeForm}>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-3xl bg-blue-50 p-5">
+            <p className="text-sm font-black uppercase tracking-wide text-blue-700">Cálculo automático</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <label className={labelClass}>Valor financiado<input value={form.financedAmount} onChange={(event) => updateField("financedAmount", event.target.value)} className={inputClass} /></label>
+              <label className={labelClass}>% retorno<input value={form.returnPercentage} onChange={(event) => updateField("returnPercentage", event.target.value)} className={inputClass} /></label>
+              <label className={labelClass}>% ILA<input value={form.ilaDiscountPercentage} onChange={(event) => updateField("ilaDiscountPercentage", event.target.value)} className={inputClass} /></label>
+              <label className={labelClass}>Valor retorno bruto<input value={form.returnAmount} readOnly className={readOnlyClass} /></label>
+              <label className={labelClass}>Desconto ILA<input value={form.ilaDiscountAmount} readOnly className={readOnlyClass} /></label>
+              <label className={labelClass}>Retorno liquido<input value={form.netReturnAmount} readOnly className={readOnlyClass} /></label>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <label className={labelClass}>Data<input type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} className={inputClass} /></label>
             <label className={labelClass}>Cliente<input value={form.customerName} onChange={(event) => updateField("customerName", event.target.value)} className={inputClass} /></label>
             <label className={labelClass}>CPF/CNPJ<input value={form.customerDocument} onChange={(event) => updateField("customerDocument", event.target.value)} className={inputClass} /></label>
@@ -136,12 +149,6 @@ export function VehicleFinancingClient() {
             <label className={labelClass}>Contrato<input value={form.contractNumber} onChange={(event) => updateField("contractNumber", event.target.value)} className={inputClass} /></label>
             <label className={labelClass}>Valor solicitado<input value={form.requestedAmount} onChange={(event) => updateField("requestedAmount", event.target.value)} className={inputClass} /></label>
             <label className={labelClass}>Entrada<input value={form.downPaymentAmount} onChange={(event) => updateField("downPaymentAmount", event.target.value)} className={inputClass} /></label>
-            <label className={labelClass}>Valor financiado<input value={form.financedAmount} onChange={(event) => updateField("financedAmount", event.target.value)} className={inputClass} /></label>
-            <label className={labelClass}>% retorno<input value={form.returnPercentage} onChange={(event) => updateField("returnPercentage", event.target.value)} className={inputClass} /></label>
-            <label className={labelClass}>Valor retorno bruto<input value={form.returnAmount} onChange={(event) => updateField("returnAmount", event.target.value)} className={inputClass} /></label>
-            <label className={labelClass}>% ILA<input value={form.ilaDiscountPercentage} onChange={(event) => updateField("ilaDiscountPercentage", event.target.value)} className={inputClass} /></label>
-            <label className={labelClass}>Desconto ILA<input value={form.ilaDiscountAmount} readOnly className={readOnlyClass} /></label>
-            <label className={labelClass}>Retorno liquido<input value={form.netReturnAmount} readOnly className={readOnlyClass} /></label>
             <label className={labelClass}>Seguro prestamista<input value={form.prestamistaInsuranceAmount} onChange={(event) => updateField("prestamistaInsuranceAmount", event.target.value)} className={inputClass} /></label>
             <label className={labelClass}>Filial<input value={form.branchName} onChange={(event) => updateField("branchName", event.target.value)} className={inputClass} /></label>
             <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700"><input type="checkbox" checked={form.returnReceived} onChange={(event) => updateField("returnReceived", event.target.checked)} />Retorno recebido</label>
