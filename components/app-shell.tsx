@@ -23,7 +23,6 @@ import {
   Wallet,
   Wrench,
 } from "lucide-react";
-import { getCompany } from "@/lib/browser-store";
 import { getBusinessProfileByLabel, isMenuKeyAllowedForBusinessProfile } from "@/lib/business-types";
 
 type MenuItem = {
@@ -37,6 +36,14 @@ type MenuGroup = {
   title: string;
   description: string;
   items: MenuItem[];
+};
+
+type CompanyContext = {
+  id: string;
+  name: string;
+  tradeName?: string | null;
+  businessType: string;
+  businessTypeLabel: string;
 };
 
 const menuGroups: MenuGroup[] = [
@@ -111,46 +118,41 @@ function findActiveGroup(pathname: string, groups: MenuGroup[]) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [company, setCompany] = useState<CompanyContext | null>(null);
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    async function checkLicense() {
+    async function loadCompanyContext() {
       try {
-        const response = await fetch("/api/license/status", { cache: "no-store" });
+        const response = await fetch("/api/company/me", { cache: "no-store" });
         const result = await response.json();
 
         if (!active) return;
 
-        if (response.ok && result.authenticated && !result.allowed) {
+        if (response.status === 402 || result.blocked) {
           window.location.href = "/licenca";
+          return;
         }
+
+        if (!response.ok || !result.success) {
+          window.location.href = "/entrar";
+          return;
+        }
+
+        setCompany(result.company);
+        setBusinessType(result.company.businessTypeLabel || "Completo / Multioperação");
       } catch {
-        // Keep the UI available while local development services are starting.
+        if (active) setBusinessType("Completo / Multioperação");
       }
     }
 
-    checkLicense();
+    loadCompanyContext();
 
     return () => {
       active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    function refreshBusinessType() {
-      setBusinessType(getCompany().businessType || "Completo / Multioperação");
-    }
-
-    refreshBusinessType();
-    window.addEventListener("storage", refreshBusinessType);
-    window.addEventListener("ajb-company-updated", refreshBusinessType);
-
-    return () => {
-      window.removeEventListener("storage", refreshBusinessType);
-      window.removeEventListener("ajb-company-updated", refreshBusinessType);
     };
   }, []);
 
@@ -196,6 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-200">Perfil ativo</p>
             <p className="mt-1 text-sm font-black text-white">{businessProfile.label}</p>
             <p className="mt-1 text-xs leading-5 text-slate-300">Menu adaptado ao universo da empresa.</p>
+            {company ? <p className="mt-2 truncate text-[11px] font-bold text-slate-400">{company.tradeName || company.name}</p> : null}
           </div>
 
           <nav className="mt-5 grid max-h-[calc(100vh-325px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
