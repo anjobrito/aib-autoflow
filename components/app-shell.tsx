@@ -183,25 +183,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-3xl bg-slate-950 p-5 text-white lg:sticky lg:top-6 lg:max-h-[calc(100vh-48px)] lg:overflow-hidden">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500">
-              <Wrench className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="font-black">AJB AutoFlow</p>
-              <p className="text-xs text-slate-300">by AJBSYSTEMS</p>
-            </div>
-          </Link>
+        <aside className="rounded-3xl bg-slate-950 p-5 text-white lg:sticky lg:top-6 lg:flex lg:h-[calc(100vh-48px)] lg:flex-col lg:overflow-hidden">
+          <div className="shrink-0">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500">
+                <Wrench className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="font-black">AJB AutoFlow</p>
+                <p className="text-xs text-slate-300">by AJBSYSTEMS</p>
+              </div>
+            </Link>
 
-          <div className="mt-6 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-200">Perfil ativo</p>
-            <p className="mt-1 text-sm font-black text-white">{businessProfile.label}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-300">Menu adaptado ao universo da empresa.</p>
-            {company ? <p className="mt-2 truncate text-[11px] font-bold text-slate-400">{company.tradeName || company.name}</p> : null}
+            <div className="mt-6 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-200">Perfil ativo</p>
+              <p className="mt-1 text-sm font-black text-white">{businessProfile.label}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">Menu adaptado ao universo da empresa.</p>
+              {company ? <p className="mt-2 truncate text-[11px] font-bold text-slate-400">{company.tradeName || company.name}</p> : null}
+            </div>
           </div>
 
-          <nav className="mt-5 grid max-h-[calc(100vh-325px)] gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
+          <nav className="mt-5 grid min-h-0 flex-1 content-start gap-3 overflow-y-auto pr-1 text-sm font-semibold text-slate-200">
             {visibleMenuGroups.map((group) => {
               const isOpen = openGroups.includes(group.title);
               const hasActiveItem = group.title === activeGroup;
@@ -245,7 +247,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="mt-5 shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Sessão</p>
             <button
               type="button"
