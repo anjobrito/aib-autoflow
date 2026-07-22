@@ -5,7 +5,6 @@ import { Pencil, Plus, Search } from "lucide-react";
 import { UiModal } from "@/components/ui-modal";
 import { getOperationalFormLabels } from "@/lib/business-domain-options";
 import { getBusinessProfileByLabel } from "@/lib/business-profiles";
-import { getCompany } from "@/lib/browser-store";
 import { serviceCategories, serviceStatuses } from "@/lib/select-options";
 
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
@@ -43,17 +42,22 @@ export function ServicesClient() {
   const labels = useMemo(() => getOperationalFormLabels(profile), [profile]);
 
   async function refresh() {
-    setBusinessType(getCompany().businessType || "Completo / Multioperação");
     setMessage("");
 
     try {
-      const query = searchTerm.trim() ? `?search=${encodeURIComponent(searchTerm.trim())}` : "";
-      const response = await fetch(`/api/services${query}`, { cache: "no-store" });
-      const result = await response.json();
+      const [companyResponse, servicesResponse] = await Promise.all([
+        fetch("/api/company/me", { cache: "no-store" }),
+        fetch(`/api/services${searchTerm.trim() ? `?search=${encodeURIComponent(searchTerm.trim())}` : ""}`, { cache: "no-store" }),
+      ]);
+      const companyResult = await companyResponse.json();
+      const servicesResult = await servicesResponse.json();
 
-      if (!response.ok || !result.success) throw new Error(result.message || "Services API unavailable");
+      if (!companyResponse.ok || !companyResult.success) throw new Error(companyResult.message || "Company API unavailable");
+      if (!servicesResponse.ok || !servicesResult.success) throw new Error(servicesResult.message || "Services API unavailable");
 
-      const apiServices = (result.services || []).map((service: any) => ({
+      setBusinessType(companyResult.company.businessTypeLabel || "Completo / Multioperação");
+
+      const apiServices = (servicesResult.services || []).map((service: any) => ({
         id: service.id,
         name: service.name,
         category: service.category,
@@ -73,10 +77,6 @@ export function ServicesClient() {
 
   useEffect(() => {
     refresh();
-    window.addEventListener("ajb-company-updated", refresh);
-    return () => {
-      window.removeEventListener("ajb-company-updated", refresh);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
