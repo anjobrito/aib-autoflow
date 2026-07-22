@@ -5,7 +5,7 @@ import { Pencil, Plus, Search } from "lucide-react";
 import { UiModal } from "@/components/ui-modal";
 import { getOperationalFormLabels } from "@/lib/business-domain-options";
 import { getBusinessProfileByLabel } from "@/lib/business-profiles";
-import { calculateMargin, getCompany, listSuppliers, StoredSupplier } from "@/lib/browser-store";
+import { calculateMargin, listSuppliers, StoredSupplier } from "@/lib/browser-store";
 import { productCategories } from "@/lib/select-options";
 
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
@@ -67,18 +67,23 @@ export function ProductsClient() {
   const labels = useMemo(() => getOperationalFormLabels(profile), [profile]);
 
   async function refresh() {
-    setBusinessType(getCompany().businessType || "Completo / Multioperação");
     setSuppliers(listSuppliers());
     setMessage("");
 
     try {
-      const query = searchTerm.trim() ? `?search=${encodeURIComponent(searchTerm.trim())}` : "";
-      const response = await fetch(`/api/products${query}`, { cache: "no-store" });
-      const result = await response.json();
+      const [companyResponse, productsResponse] = await Promise.all([
+        fetch("/api/company/me", { cache: "no-store" }),
+        fetch(`/api/products${searchTerm.trim() ? `?search=${encodeURIComponent(searchTerm.trim())}` : ""}`, { cache: "no-store" }),
+      ]);
+      const companyResult = await companyResponse.json();
+      const productsResult = await productsResponse.json();
 
-      if (!response.ok || !result.success) throw new Error(result.message || "Products API unavailable");
+      if (!companyResponse.ok || !companyResult.success) throw new Error(companyResult.message || "Company API unavailable");
+      if (!productsResponse.ok || !productsResult.success) throw new Error(productsResult.message || "Products API unavailable");
 
-      const apiProducts = (result.products || []).map((product: any) => ({
+      setBusinessType(companyResult.company.businessTypeLabel || "Completo / Multioperação");
+
+      const apiProducts = (productsResult.products || []).map((product: any) => ({
         id: product.id,
         name: product.name,
         category: product.category,
@@ -101,11 +106,6 @@ export function ProductsClient() {
 
   useEffect(() => {
     refresh();
-    window.addEventListener("ajb-company-updated", refresh);
-
-    return () => {
-      window.removeEventListener("ajb-company-updated", refresh);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
