@@ -97,6 +97,7 @@ model Company {
   services           Service[]
   workOrders         WorkOrder[]
   reminders          MaintenanceReminder[]
+  financings         VehicleFinancing[]
   subscription       Subscription?
 }
 
@@ -182,10 +183,11 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
-  vehicles  Vehicle[]
+  company    Company            @relation(fields: [companyId], references: [id])
+  vehicles   Vehicle[]
   workOrders WorkOrder[]
-  reminders MaintenanceReminder[]
+  reminders  MaintenanceReminder[]
+  financings VehicleFinancing[]
 
   @@index([companyId])
   @@index([companyId, name])
@@ -206,10 +208,11 @@ model Vehicle {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  company    Company  @relation(fields: [companyId], references: [id])
-  customer   Customer @relation(fields: [customerId], references: [id])
+  company    Company            @relation(fields: [companyId], references: [id])
+  customer   Customer           @relation(fields: [customerId], references: [id])
   workOrders WorkOrder[]
   reminders  MaintenanceReminder[]
+  financings VehicleFinancing[]
 
   @@index([companyId])
   @@index([customerId])
@@ -302,6 +305,51 @@ model MaintenanceReminder {
   vehicle     Vehicle         @relation(fields: [vehicleId], references: [id])
 
   @@index([companyId])
+}
+
+model VehicleFinancing {
+  id                         String   @id @default(cuid())
+  companyId                  String
+  customerId                 String?
+  vehicleId                  String?
+  sellerName                 String   @default("")
+  date                       DateTime @default(now())
+  financedBank               String   @default("")
+  customerDocument           String   @default("")
+  customerName               String   @default("")
+  customerPhone              String   @default("")
+  vehicleBrand               String   @default("")
+  vehicleModel               String   @default("")
+  vehiclePlate               String   @default("")
+  vehicleChassis             String   @default("")
+  vehicleYear                String   @default("")
+  contractNumber             String   @default("")
+  requestedAmount            Decimal  @default(0)
+  downPaymentAmount          Decimal  @default(0)
+  financedAmount             Decimal  @default(0)
+  returnPercentage           Decimal  @default(0)
+  returnAmount               Decimal  @default(0)
+  ilaDiscountPercentage      Decimal  @default(26)
+  ilaDiscountAmount          Decimal  @default(0)
+  netReturnAmount            Decimal  @default(0)
+  prestamistaInsuranceAmount Decimal  @default(0)
+  branchName                 String   @default("Matriz")
+  financingStatus            String   @default("EM_ANALISE")
+  lienStatus                 String   @default("NAO_INICIADO")
+  returnReceived             Boolean  @default(false)
+  notes                      String   @default("")
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  company                    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer                   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  vehicle                    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([companyId, date])
+  @@index([companyId, contractNumber])
 }
 
 model Subscription {
