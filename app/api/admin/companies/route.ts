@@ -5,7 +5,8 @@ import { platformAdminErrorResponse, requireSupportPlatformAdmin } from "@/lib/p
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function isRevenueCompany(company: { subscriptionStatus: string; accessBlocked: boolean; subscription: { status: string; priceCents: number } | null }) {
+function isRevenueCompany(company: { isDemo: boolean; subscriptionStatus: string; accessBlocked: boolean; subscription: { status: string; priceCents: number } | null }) {
+  if (company.isDemo) return false;
   if (company.accessBlocked) return false;
   if (!["ACTIVE", "TRIAL"].includes(company.subscriptionStatus)) return false;
   if (!company.subscription) return false;
@@ -43,6 +44,11 @@ export async function GET() {
 
     const summary = companies.reduce(
       (acc, company) => {
+        if (company.isDemo) {
+          acc.demo += 1;
+          return acc;
+        }
+
         acc.total += 1;
         if (company.subscriptionStatus === "ACTIVE") acc.active += 1;
         if (company.subscriptionStatus === "TRIAL") acc.trial += 1;
@@ -52,7 +58,7 @@ export async function GET() {
         if (isRevenueCompany(company)) acc.monthlyRevenueCents += Number(company.subscription?.priceCents || 0);
         return acc;
       },
-      { total: 0, active: 0, trial: 0, pastDue: 0, canceled: 0, blocked: 0, monthlyRevenueCents: 0 },
+      { total: 0, demo: 0, active: 0, trial: 0, pastDue: 0, canceled: 0, blocked: 0, monthlyRevenueCents: 0 },
     );
 
     return NextResponse.json({ success: true, summary, companies });
