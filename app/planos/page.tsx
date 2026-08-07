@@ -2,27 +2,30 @@ import { ArrowRight, CheckCircle2, Gauge } from "lucide-react";
 
 const plans = [
   {
-    name: "Start",
+    name: "Start Mensal",
     price: "R$ 49,90",
-    badge: "Piloto recomendado",
-    description: "Para oficina, funilaria, lava-jato ou estética que precisa começar a controlar clientes, veículos, OS e serviços.",
-    features: ["Até 3 usuários", "Clientes e veículos", "Serviços e estoque básico", "Ordens de serviço", "Suporte inicial"],
-    highlight: true,
-  },
-  {
-    name: "Pro",
-    price: "R$ 79,90",
-    badge: "Operação em crescimento",
-    description: "Para negócios que precisam controlar volume, pátio, equipe e financeiro operacional.",
-    features: ["Usuários adicionais", "OS ilimitadas", "Lembretes de manutenção", "Financeiro operacional", "Prioridade em melhorias"],
+    suffix: "/mês",
+    badge: "Entrada simples",
+    description: "Cobrança recorrente mensal para começar sem compromisso anual.",
+    features: ["Clientes e veículos", "Ordens e pátio", "Serviços e estoque", "Financeiro operacional", "Suporte inicial"],
     highlight: false,
   },
   {
-    name: "Enterprise/Piloto",
+    name: "Start Anual",
+    price: "R$ 499,00",
+    suffix: "/ano",
+    badge: "Melhor custo anual",
+    description: "Cobrança recorrente a cada 12 meses com o mesmo núcleo operacional do plano Start.",
+    features: ["Todos os recursos do Start", "Uma cobrança por ano", "Menor custo equivalente mensal", "Atualizações do produto", "Suporte inicial"],
+    highlight: true,
+  },
+  {
+    name: "Enterprise / Projeto",
     price: "Sob consulta",
+    suffix: "",
     badge: "Contrato assistido",
-    description: "Para pilotos acompanhados, requisitos específicos, migração de dados e módulos comerciais sob demanda.",
-    features: ["Setup acompanhado", "Validação com equipe", "Customizações comerciais", "Treinamento", "Integrações futuras"],
+    description: "Para migração de dados, requisitos específicos, implantação acompanhada e integrações sob demanda.",
+    features: ["Setup acompanhado", "Migração planejada", "Customizações comerciais", "Treinamento", "Integrações"],
     highlight: false,
   },
 ];
@@ -48,9 +51,9 @@ export default function PlanosPage() {
       <section className="mx-auto max-w-7xl px-6 py-16 sm:px-10 lg:px-16">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-black uppercase tracking-wide text-blue-700">Planos SaaS para operação automotiva</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Venda agora, libere manualmente e evolua para cobrança automática.</h1>
+          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Escolha mensal ou anual e centralize sua operação.</h1>
           <p className="mt-5 text-lg leading-8 text-slate-600">
-            O AJB AutoFlow já pode operar com liberação manual de licença pelo painel AJBSYSTEMS. O cliente cadastra a empresa, você define o plano e libera o acesso após pagamento.
+            Cadastre a empresa, entre no AJB AutoFlow e acesse a área de assinatura. Quando o Mercado Pago estiver habilitado, a contratação e a liberação são processadas automaticamente. A AJBSYSTEMS mantém a liberação manual como contingência.
           </p>
         </div>
 
@@ -59,7 +62,7 @@ export default function PlanosPage() {
             <div key={plan.name} className={`rounded-[2rem] p-6 shadow-sm ${plan.highlight ? "bg-slate-950 text-white" : "bg-white text-slate-950"}`}>
               <p className={plan.highlight ? "text-blue-300" : "text-blue-700"}>{plan.badge}</p>
               <h2 className="mt-2 text-3xl font-black">{plan.name}</h2>
-              <p className="mt-4 text-5xl font-black">{plan.price}</p>
+              <p className="mt-4 text-5xl font-black">{plan.price}<span className={`ml-1 text-base ${plan.highlight ? "text-slate-400" : "text-slate-500"}`}>{plan.suffix}</span></p>
               <p className={`mt-3 text-sm leading-6 ${plan.highlight ? "text-slate-300" : "text-slate-600"}`}>{plan.description}</p>
               <div className="mt-6 grid gap-3">
                 {plan.features.map((feature) => (
@@ -77,8 +80,9 @@ export default function PlanosPage() {
         </div>
 
         <div className="mt-10 rounded-[2rem] bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-black uppercase tracking-wide text-blue-700">Fluxo comercial imediato</p>
-          <p className="mt-2 text-lg font-bold text-slate-700">Cadastro → pagamento manual → liberação no /admin → cliente usa o sistema.</p>
+          <p className="text-sm font-black uppercase tracking-wide text-blue-700">Fluxo comercial</p>
+          <p className="mt-2 text-lg font-bold text-slate-700">Cadastro → login → /assinatura → Mercado Pago → confirmação server-to-server → licença ativa.</p>
+          <p className="mt-2 text-sm text-slate-500">Os valores mensal e anual podem ser alterados na configuração de produção sem alteração de código.</p>
         </div>
       </section>
     </main>
