@@ -12,6 +12,9 @@ enum BusinessType {
   CAR_WASH
   AUTO_DETAILING
   AUTO_PARTS
+  CAR_DEALERSHIP
+  PARKING_LOT
+  FULL_AUTO_CENTER
   OTHER
 }
 
@@ -20,12 +23,31 @@ enum UserRole {
   MANAGER
   MECHANIC
   ATTENDANT
+  SALES
+  FINANCIAL
+}
+
+enum SystemRole {
+  NONE
+  SUPPORT
+  BILLING
+  MASTER
+}
+
+enum PlatformAdminRole {
+  SUPPORT
+  BILLING
+  MASTER
 }
 
 enum WorkOrderStatus {
   OPEN
+  QUOTE
+  APPROVED
   IN_PROGRESS
   WAITING_PARTS
+  PAINTING
+  FINISHING
   READY_FOR_PICKUP
   DELIVERED
   CANCELED
@@ -45,6 +67,12 @@ enum SubscriptionStatus {
   BLOCKED
 }
 
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
 model Company {
   id                 String             @id @default(cuid())
   name               String
@@ -52,37 +80,101 @@ model Company {
   cnpj               String             @unique
   businessType       BusinessType       @default(AUTO_REPAIR)
   email              String
-  phone              String?
+  phone               String?
   city               String?
   state              String?
   subscriptionStatus SubscriptionStatus @default(TRIAL)
+  accessBlocked      Boolean            @default(false)
+  lockedReason       String?
+  isDemo             Boolean            @default(false)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   users              User[]
+  sessions           Session[]
   customers          Customer[]
   vehicles           Vehicle[]
   products           Product[]
   services           Service[]
   workOrders         WorkOrder[]
   reminders          MaintenanceReminder[]
+  financings         VehicleFinancing[]
+  suppliers          Supplier[]
+  employees          Employee[]
+  financialEntries   FinancialEntry[]
+  inspections        VehicleInspection[]
   subscription       Subscription?
+
+  @@index([isDemo])
 }
 
 model User {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String
-  email     String   @unique
-  password  String
-  role      UserRole @default(ATTENDANT)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String     @id @default(cuid())
+  companyId    String
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(ATTENDANT)
+  systemRole   SystemRole @default(NONE)
+  active       Boolean    @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
+  company      Company    @relation(fields: [companyId], references: [id])
+  sessions     Session[]
 
   @@index([companyId])
+  @@index([systemRole])
+}
+
+model Session {
+  id        String        @id @default(cuid())
+  companyId String
+  userId    String
+  tokenHash String        @unique
+  status    SessionStatus @default(ACTIVE)
+  expiresAt DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  company   Company       @relation(fields: [companyId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PlatformAdmin {
+  id           String             @id @default(cuid())
+  name         String
+  email        String             @unique
+  passwordHash String
+  role         PlatformAdminRole  @default(SUPPORT)
+  active       Boolean            @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  sessions     PlatformAdminSession[]
+
+  @@index([role])
+}
+
+model PlatformAdminSession {
+  id        String        @id @default(cuid())
+  adminId   String
+  tokenHash String        @unique
+  status    SessionStatus @default(ACTIVE)
+  expiresAt DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  admin     PlatformAdmin @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([expiresAt])
 }
 
 model Customer {
@@ -94,15 +186,18 @@ model Customer {
   phone     String?
   city      String?
   state     String?
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
-  vehicles  Vehicle[]
+  company    Company            @relation(fields: [companyId], references: [id])
+  vehicles   Vehicle[]
   workOrders WorkOrder[]
-  reminders MaintenanceReminder[]
+  reminders  MaintenanceReminder[]
+  financings VehicleFinancing[]
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model Vehicle {
@@ -115,16 +210,20 @@ model Vehicle {
   year       Int?
   color      String?
   mileage    Int?
+  powertrain String?
+  active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  company    Company  @relation(fields: [companyId], references: [id])
-  customer   Customer @relation(fields: [customerId], references: [id])
+  company    Company            @relation(fields: [companyId], references: [id])
+  customer   Customer           @relation(fields: [customerId], references: [id])
   workOrders WorkOrder[]
   reminders  MaintenanceReminder[]
+  financings VehicleFinancing[]
 
   @@index([companyId])
   @@index([customerId])
+  @@index([companyId, plate])
 }
 
 model Product {
@@ -135,6 +234,7 @@ model Product {
   name         String
   category     String?
   brand        String?
+  supplierName String?
   costPrice    Decimal  @default(0)
   salePrice    Decimal  @default(0)
   currentStock Decimal  @default(0)
@@ -146,13 +246,16 @@ model Product {
   company      Company  @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model Service {
   id          String   @id @default(cuid())
   companyId   String
   name        String
+  category    String?
   description String?
+  duration    String?
   price       Decimal  @default(0)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -161,31 +264,58 @@ model Service {
   company     Company  @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
+  @@index([companyId, name])
 }
 
 model WorkOrder {
-  id          String          @id @default(cuid())
-  companyId   String
-  customerId  String
-  vehicleId   String
-  code        String
-  status      WorkOrderStatus @default(OPEN)
-  description String?
-  totalParts  Decimal         @default(0)
-  totalServices Decimal       @default(0)
-  totalAmount Decimal         @default(0)
-  openedAt    DateTime        @default(now())
-  closedAt    DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  companyId     String
+  customerId    String
+  vehicleId     String
+  code          String
+  status        WorkOrderStatus @default(OPEN)
+  description   String?
+  totalParts    Decimal         @default(0)
+  totalServices Decimal         @default(0)
+  totalAmount   Decimal         @default(0)
+  openedAt      DateTime        @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  company     Company         @relation(fields: [companyId], references: [id])
-  customer    Customer        @relation(fields: [customerId], references: [id])
-  vehicle     Vehicle         @relation(fields: [vehicleId], references: [id])
+  company       Company         @relation(fields: [companyId], references: [id])
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  vehicle       Vehicle         @relation(fields: [vehicleId], references: [id])
+  inspection    VehicleInspection?
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([companyId, code])
+}
+
+model VehicleInspection {
+  id               String   @id @default(cuid())
+  companyId        String
+  workOrderId      String   @unique
+  plate            String
+  mileage          String?
+  fuelLevel        String?
+  hasDocuments     Boolean  @default(false)
+  hasSpareTire     Boolean  @default(false)
+  hasJack          Boolean  @default(false)
+  hasPersonalItems Boolean  @default(false)
+  personalItems    String?
+  damages          String[] @default([])
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, workOrderId])
 }
 
 model MaintenanceReminder {
@@ -209,16 +339,134 @@ model MaintenanceReminder {
   @@index([companyId])
 }
 
-model Subscription {
-  id        String             @id @default(cuid())
-  companyId String             @unique
-  plan      String             @default("START")
-  status    SubscriptionStatus @default(TRIAL)
-  priceCents Int               @default(4990)
-  startedAt DateTime           @default(now())
-  expiresAt DateTime?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+model VehicleFinancing {
+  id                         String   @id @default(cuid())
+  companyId                  String
+  customerId                 String?
+  vehicleId                  String?
+  sellerName                 String   @default("")
+  date                       DateTime @default(now())
+  financedBank               String   @default("")
+  customerDocument           String   @default("")
+  customerName               String   @default("")
+  customerPhone              String   @default("")
+  vehicleBrand               String   @default("")
+  vehicleModel               String   @default("")
+  vehiclePlate               String   @default("")
+  vehicleChassis             String   @default("")
+  vehicleYear                String   @default("")
+  contractNumber             String   @default("")
+  requestedAmount            Decimal  @default(0)
+  downPaymentAmount          Decimal  @default(0)
+  financedAmount             Decimal  @default(0)
+  returnPercentage           Decimal  @default(0)
+  returnAmount               Decimal  @default(0)
+  ilaDiscountPercentage      Decimal  @default(26)
+  ilaDiscountAmount          Decimal  @default(0)
+  netReturnAmount            Decimal  @default(0)
+  prestamistaInsuranceAmount Decimal  @default(0)
+  branchName                 String   @default("Matriz")
+  financingStatus            String   @default("EM_ANALISE")
+  lienStatus                 String   @default("NAO_INICIADO")
+  returnReceived             Boolean  @default(false)
+  notes                      String   @default("")
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
-  company   Company            @relation(fields: [companyId], references: [id])
+  company                    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer                   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  vehicle                    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([companyId, date])
+  @@index([companyId, contractNumber])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  document  String?
+  phone     String?
+  email     String?
+  city      String?
+  state     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, name])
+}
+
+model Employee {
+  id                     String   @id @default(cuid())
+  companyId              String
+  name                   String
+  cpf                    String?
+  phone                   String?
+  email                   String?
+  role                    String
+  employmentType          String
+  status                  String   @default("Ativo")
+  serviceCommissionType   String   @default("Sem comissão")
+  serviceCommissionValue  String?
+  partCommissionType      String   @default("Sem comissão")
+  partCommissionValue     String?
+  washCommissionType      String   @default("Sem comissão")
+  washCommissionValue     String?
+  active                  Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  company                 Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, name])
+}
+
+model FinancialEntry {
+  id            String   @id @default(cuid())
+  companyId     String
+  type          String
+  description   String
+  personName    String?
+  reference     String?
+  category      String
+  amount        Decimal  @default(0)
+  dueDate       DateTime
+  settledAt     DateTime?
+  status        String   @default("Pendente")
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  companyId   String             @unique
+  plan        String             @default("BASIC")
+  status      SubscriptionStatus @default(TRIAL)
+  priceCents  Int                @default(9700)
+  startedAt   DateTime           @default(now())
+  trialEndsAt DateTime?
+  expiresAt   DateTime?
+  lastPaidAt  DateTime?
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  company     Company            @relation(fields: [companyId], references: [id])
 }

@@ -3,26 +3,37 @@
 import Link from "next/link";
 import { Bell, Car, ClipboardList, Package, Users, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getCompany, getDashboardStats, listWorkOrders, StoredWorkOrder } from "@/lib/browser-store";
-import { filterWorkOrdersByBusinessProfile } from "@/lib/business-profile-work-orders";
 import { BusinessProfile, getBusinessProfileByLabel } from "@/lib/business-types";
 
-type DashboardFallbackRow = [string, string, string, string];
-
-const fallbackOrdersByProfile: Record<BusinessProfile["id"], DashboardFallbackRow[]> = {
-  COMPLETO: [["OP-1024", "João Pereira", "Honda Civic", "Em atendimento"], ["OP-1025", "Maria Souza", "Fiat Argo", "Aguardando"], ["OP-1026", "Carlos Lima", "VW Gol", "Pronto"]],
-  OFICINA: [["OS-1024", "João Pereira", "Honda Civic", "Em andamento"], ["OS-1025", "Maria Souza", "Fiat Argo", "Aguardando peça"], ["OS-1026", "Carlos Lima", "VW Gol", "Pronta para retirada"]],
-  LAVA_JATO: [["LAV-1024", "João Pereira", "Honda Civic", "Em lavagem"], ["LAV-1025", "Maria Souza", "Fiat Argo", "Acabamento"], ["LAV-1026", "Carlos Lima", "VW Gol", "Pronto"]],
-  ESTETICA: [["EST-1024", "João Pereira", "Honda Civic", "Em execução"], ["EST-1025", "Maria Souza", "Fiat Argo", "Cura/secagem"], ["EST-1026", "Carlos Lima", "VW Gol", "Revisão final"]],
-  CENTRO_AUTOMOTIVO: [["OA-1024", "João Pereira", "Honda Civic", "Diagnóstico"], ["OA-1025", "Maria Souza", "Fiat Argo", "Em execução"], ["OA-1026", "Carlos Lima", "VW Gol", "Controle de qualidade"]],
-  ESTACIONAMENTO: [["MOV-1024", "João Pereira", "Honda Civic", "Estacionado"], ["MOV-1025", "Maria Souza", "Fiat Argo", "Mensalista"], ["MOV-1026", "Carlos Lima", "VW Gol", "Pagamento pendente"]],
-  REVENDEDORA: [["PV-1024", "João Pereira", "Honda Civic", "Preparação"], ["PV-1025", "Maria Souza", "Fiat Argo", "Em negociação"], ["PV-1026", "Carlos Lima", "VW Gol", "Documentação"]],
-  AUTOPECAS: [["PED-1024", "João Pereira", "Pedido balcão", "Separação"], ["PED-1025", "Maria Souza", "Entrega local", "Aguardando pagamento"], ["PED-1026", "Carlos Lima", "Pedido online", "Faturado"]],
+type DashboardOrder = {
+  id: string;
+  code: string;
+  customer: string;
+  vehicle: string;
+  status: string;
 };
 
-function getFallbackOrders(profile: BusinessProfile) {
-  return fallbackOrdersByProfile[profile.id] ?? fallbackOrdersByProfile.COMPLETO;
-}
+type DashboardStats = {
+  customers: number;
+  vehicles: number;
+  products: number;
+  services: number;
+  workOrders: number;
+  openWorkOrders: number;
+  readyWorkOrders: number;
+  lowStock: number;
+};
+
+const emptyStats: DashboardStats = {
+  customers: 0,
+  vehicles: 0,
+  products: 0,
+  services: 0,
+  workOrders: 0,
+  openWorkOrders: 0,
+  readyWorkOrders: 0,
+  lowStock: 0,
+};
 
 function getInventoryCardLabel(profile: BusinessProfile) {
   if (profile.id === "REVENDEDORA") return "Veículos no estoque";
@@ -49,30 +60,71 @@ function getStockSummaryLabel(profile: BusinessProfile) {
   return "itens em estoque baixo";
 }
 
+function asNumber(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function DashboardClient() {
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
-  const [stats, setStats] = useState({ customers: 0, vehicles: 0, products: 0, services: 0, workOrders: 0, openWorkOrders: 0, readyWorkOrders: 0, lowStock: 0 });
-  const [orders, setOrders] = useState<StoredWorkOrder[]>([]);
+  const [stats, setStats] = useState<DashboardStats>(emptyStats);
+  const [orders, setOrders] = useState<DashboardOrder[]>([]);
+  const [message, setMessage] = useState("");
+
+  async function refresh() {
+    setMessage("");
+    try {
+      const [companyResponse, customersResponse, vehiclesResponse, productsResponse, servicesResponse, ordersResponse] = await Promise.all([
+        fetch("/api/company/me", { cache: "no-store" }),
+        fetch("/api/customers", { cache: "no-store" }),
+        fetch("/api/vehicles", { cache: "no-store" }),
+        fetch("/api/products", { cache: "no-store" }),
+        fetch("/api/services", { cache: "no-store" }),
+        fetch("/api/work-orders?scope=active", { cache: "no-store" }),
+      ]);
+
+      const [companyResult, customersResult, vehiclesResult, productsResult, servicesResult, ordersResult] = await Promise.all([
+        companyResponse.json(),
+        customersResponse.json(),
+        vehiclesResponse.json(),
+        productsResponse.json(),
+        servicesResponse.json(),
+        ordersResponse.json(),
+      ]);
+
+      if (![companyResponse, customersResponse, vehiclesResponse, productsResponse, servicesResponse, ordersResponse].every((response) => response.ok)) {
+        throw new Error("Dashboard API unavailable");
+      }
+
+      setBusinessType(companyResult.company?.businessTypeLabel || "Completo / Multioperação");
+
+      const products = productsResult.products || [];
+      const activeOrders: DashboardOrder[] = ordersResult.orders || [];
+      const readyStatuses = new Set(["READY_FOR_PICKUP", "Pronta para retirada", "Pronto", "READY"]);
+
+      setStats({
+        customers: (customersResult.customers || []).length,
+        vehicles: (vehiclesResult.vehicles || []).length,
+        products: products.length,
+        services: (servicesResult.services || []).length,
+        workOrders: activeOrders.length,
+        openWorkOrders: activeOrders.filter((order) => !readyStatuses.has(order.status)).length,
+        readyWorkOrders: activeOrders.filter((order) => readyStatuses.has(order.status)).length,
+        lowStock: products.filter((product: { currentStock?: unknown; minStock?: unknown }) => asNumber(product.currentStock) <= asNumber(product.minStock)).length,
+      });
+      setOrders(activeOrders.slice(0, 4));
+    } catch {
+      setStats(emptyStats);
+      setOrders([]);
+      setMessage("Não foi possível carregar os indicadores agora. Nenhum dado fictício foi exibido.");
+    }
+  }
 
   useEffect(() => {
-    function refresh() {
-      const company = getCompany();
-      const profile = getBusinessProfileByLabel(company.businessType || "Completo / Multioperação");
-      const profileOrders = filterWorkOrdersByBusinessProfile(listWorkOrders(), profile);
-      const dashboardStats = getDashboardStats();
-      setBusinessType(profile.label);
-      setStats({ ...dashboardStats, workOrders: profileOrders.length, openWorkOrders: profileOrders.filter((order) => !profile.kanbanStatuses.slice(-1).includes(order.status)).length, readyWorkOrders: profileOrders.filter((order) => profile.kanbanStatuses.slice(-2, -1).includes(order.status)).length });
-      setOrders(profileOrders.slice(0, 4));
-    }
-
     refresh();
-    window.addEventListener("storage", refresh);
     window.addEventListener("ajb-company-updated", refresh);
-
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("ajb-company-updated", refresh);
-    };
+    return () => window.removeEventListener("ajb-company-updated", refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const profile = useMemo(() => getBusinessProfileByLabel(businessType), [businessType]);
@@ -86,6 +138,7 @@ export function DashboardClient() {
 
   return (
     <>
+      {message ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">{message}</div> : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -102,9 +155,7 @@ export function DashboardClient() {
           <div className="grid gap-3">
             {orders.length > 0 ? orders.map((order) => (
               <Link key={order.id} href={`/ordens-servico/${order.id}`} className="grid gap-2 rounded-2xl border border-slate-200 p-4 hover:bg-slate-50 sm:grid-cols-[120px_1fr_1fr_180px] sm:items-center"><p className="font-black">{order.code}</p><p>{order.customer}</p><p className="text-slate-600">{order.vehicle}</p><span className="rounded-full bg-blue-50 px-3 py-1 text-center text-xs font-bold text-blue-700">{order.status}</span></Link>
-            )) : getFallbackOrders(profile).map(([code, customer, vehicle, status]) => (
-              <div key={code} className="grid gap-2 rounded-2xl border border-slate-200 p-4 sm:grid-cols-[120px_1fr_1fr_180px] sm:items-center"><p className="font-black">{code}</p><p>{customer}</p><p className="text-slate-600">{vehicle}</p><span className="rounded-full bg-blue-50 px-3 py-1 text-center text-xs font-bold text-blue-700">{status}</span></div>
-            ))}
+            )) : <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Nenhuma operação cadastrada para esta empresa.</div>}
           </div>
         </div>
 

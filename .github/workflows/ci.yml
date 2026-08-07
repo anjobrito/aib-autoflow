@@ -4,9 +4,12 @@ on:
   pull_request:
     branches:
       - main
+      - feature/saas-foundation-prisma-postgres-auth
   push:
     branches:
       - main
+      - feature/saas-foundation-prisma-postgres-auth
+      - feature/**
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,8 +17,27 @@ concurrency:
 
 jobs:
   build:
-    name: Build and type-check
+    name: Build, Prisma and migration validation
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ajb_autoflow_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d ajb_autoflow_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/ajb_autoflow_ci
+      AUTH_SECRET: ci-build-only-secret
 
     steps:
       - name: Checkout repository
@@ -24,11 +46,37 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Apply migrations like production
+        run: npx prisma migrate deploy
+
+      - name: Confirm migration state
+        run: npx prisma migrate status
+
+      - name: Guard against destructive production commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE 'prisma[[:space:]]+(migrate[[:space:]]+reset|db[[:space:]]+push)' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude='*.md' \
+            --exclude='package-lock.json' \
+            .; then
+            echo 'Comando Prisma destrutivo encontrado fora da documentação.'
+            exit 1
+          fi
 
       - name: Run production build
         run: npm run build

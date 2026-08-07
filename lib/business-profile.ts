@@ -1,4 +1,6 @@
-import { StoredCompany } from "@/lib/browser-store";
+export type CompanyBusinessProfileSource = {
+  businessType: string;
+};
 
 export type BusinessProfile = {
   kind: "workshop" | "carwash" | "parts" | "general";
@@ -12,10 +14,10 @@ export type BusinessProfile = {
   customerReturnMessage: string;
 };
 
-export function getBusinessProfile(company: StoredCompany): BusinessProfile {
+export function getBusinessProfile(company: CompanyBusinessProfileSource): BusinessProfile {
   const type = company.businessType.toLowerCase();
 
-  if (type.includes("lava") || type.includes("lavagem")) {
+  if (type.includes("lava") || type.includes("lavagem") || type.includes("car_wash")) {
     return {
       kind: "carwash",
       operationLabel: "Lavagens",
@@ -29,7 +31,7 @@ export function getBusinessProfile(company: StoredCompany): BusinessProfile {
     };
   }
 
-  if (type.includes("estética") || type.includes("estetica") || type.includes("detalhamento")) {
+  if (type.includes("estética") || type.includes("estetica") || type.includes("detalhamento") || type.includes("auto_detailing")) {
     return {
       kind: "carwash",
       operationLabel: "Estética",
@@ -43,7 +45,7 @@ export function getBusinessProfile(company: StoredCompany): BusinessProfile {
     };
   }
 
-  if (type.includes("autopeças") || type.includes("autopecas") || type.includes("peças") || type.includes("pecas")) {
+  if (type.includes("autopeças") || type.includes("autopecas") || type.includes("peças") || type.includes("pecas") || type.includes("auto_parts")) {
     return {
       kind: "parts",
       operationLabel: "Peças",
@@ -57,7 +59,7 @@ export function getBusinessProfile(company: StoredCompany): BusinessProfile {
     };
   }
 
-  if (type.includes("oficina") || type.includes("mecânica") || type.includes("mecanica") || type.includes("centro")) {
+  if (type.includes("oficina") || type.includes("mecânica") || type.includes("mecanica") || type.includes("centro") || type.includes("auto_repair") || type.includes("full_auto_center")) {
     return {
       kind: "workshop",
       operationLabel: "Revisões",
