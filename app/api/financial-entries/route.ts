@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   const paymentMethod = normalize(formData.get("paymentMethod"));
   const notes = normalize(formData.get("notes"));
 
-  if (!['Pagar', 'Receber'].includes(type)) {
+  if (!["Pagar", "Receber"].includes(type)) {
     return NextResponse.json({ success: false, message: "Tipo financeiro inválido." }, { status: 400 });
   }
 
@@ -90,6 +91,23 @@ export async function POST(request: Request) {
       status,
       paymentMethod: paymentMethod || null,
       notes: notes || null,
+    },
+  });
+
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "FINANCIAL_ENTRY_CREATED",
+    entityType: "FinancialEntry",
+    entityId: entry.id,
+    newValue: {
+      type: entry.type,
+      description: entry.description,
+      category: entry.category,
+      amount: entry.amount.toString(),
+      dueDate: entry.dueDate,
+      status: entry.status,
+      personName: entry.personName,
+      reference: entry.reference,
     },
   });
 
