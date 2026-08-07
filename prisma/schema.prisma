@@ -100,6 +100,7 @@ model Company {
   financings         VehicleFinancing[]
   suppliers          Supplier[]
   employees          Employee[]
+  financialEntries   FinancialEntry[]
   subscription       Subscription?
 }
 
@@ -378,25 +379,50 @@ model Employee {
   companyId              String
   name                   String
   cpf                    String?
-  phone                  String?
-  email                  String?
-  role                   String
-  employmentType         String
-  status                 String   @default("Ativo")
-  serviceCommissionType  String   @default("Sem comissão")
-  serviceCommissionValue String?
-  partCommissionType     String   @default("Sem comissão")
-  partCommissionValue    String?
-  washCommissionType     String   @default("Sem comissão")
-  washCommissionValue    String?
-  active                 Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  phone                   String?
+  email                   String?
+  role                    String
+  employmentType          String
+  status                  String   @default("Ativo")
+  serviceCommissionType   String   @default("Sem comissão")
+  serviceCommissionValue  String?
+  partCommissionType      String   @default("Sem comissão")
+  partCommissionValue     String?
+  washCommissionType      String   @default("Sem comissão")
+  washCommissionValue     String?
+  active                  Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                 Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([companyId, name])
+}
+
+model FinancialEntry {
+  id            String   @id @default(cuid())
+  companyId     String
+  type          String
+  description   String
+  personName    String?
+  reference     String?
+  category      String
+  amount        Decimal  @default(0)
+  dueDate       DateTime
+  settledAt     DateTime?
+  status        String   @default("Pendente")
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
 }
 
 model Subscription {
