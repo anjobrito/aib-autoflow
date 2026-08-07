@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { SubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { platformAdminErrorResponse, requireBillingPlatformAdmin } from "@/lib/platform-admin-auth";
+import { platformAuditActor, recordAuditEvent } from "@/lib/audit";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -19,7 +20,7 @@ function isSubscriptionStatus(value: string): value is SubscriptionStatus {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireBillingPlatformAdmin();
+    const adminSession = await requireBillingPlatformAdmin();
     const { id } = await params;
     const formData = await request.formData();
 
@@ -36,7 +37,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: false, message: "Status de assinatura inválido." }, { status: 400 });
     }
 
-    const company = await prisma.company.findUnique({ where: { id } });
+    const company = await prisma.company.findUnique({
+      where: { id },
+      include: { subscription: true },
+    });
     if (!company) {
       return NextResponse.json({ success: false, message: "Empresa não encontrada." }, { status: 404 });
     }
@@ -75,6 +79,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
 
       return { company: updatedCompany, subscription };
+    });
+
+    await recordAuditEvent({
+      ...platformAuditActor(adminSession, id),
+      action: accessBlocked !== company.accessBlocked ? (accessBlocked ? "COMPANY_BLOCKED" : "COMPANY_UNBLOCKED") : "LICENSE_UPDATED",
+      entityType: "CompanySubscription",
+      entityId: id,
+      oldValue: {
+        subscriptionStatus: company.subscriptionStatus,
+        accessBlocked: company.accessBlocked,
+        lockedReason: company.lockedReason,
+        subscription: company.subscription
+          ? {
+              plan: company.subscription.plan,
+              status: company.subscription.status,
+              priceCents: company.subscription.priceCents,
+              trialEndsAt: company.subscription.trialEndsAt,
+              expiresAt: company.subscription.expiresAt,
+              notes: company.subscription.notes,
+            }
+          : null,
+      },
+      newValue: {
+        subscriptionStatus: updated.company.subscriptionStatus,
+        accessBlocked: updated.company.accessBlocked,
+        lockedReason: updated.company.lockedReason,
+        subscription: {
+          plan: updated.subscription.plan,
+          status: updated.subscription.status,
+          priceCents: updated.subscription.priceCents,
+          trialEndsAt: updated.subscription.trialEndsAt,
+          expiresAt: updated.subscription.expiresAt,
+          notes: updated.subscription.notes,
+        },
+      },
     });
 
     return NextResponse.json({ success: true, ...updated });
