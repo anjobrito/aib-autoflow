@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getCompany } from "@/lib/browser-store";
 import { getBusinessProfileByLabel } from "@/lib/business-types";
 
 type BusinessAwarePageHeaderProps = {
@@ -12,17 +11,25 @@ export function BusinessAwarePageHeader({ context }: BusinessAwarePageHeaderProp
   const [businessType, setBusinessType] = useState("Completo / Multioperação");
 
   useEffect(() => {
-    function refreshBusinessType() {
-      setBusinessType(getCompany().businessType || "Completo / Multioperação");
+    let active = true;
+
+    async function loadBusinessType() {
+      try {
+        const response = await fetch("/api/company/me", { cache: "no-store" });
+        const result = await response.json();
+        if (!active) return;
+
+        if (response.ok && result.success) {
+          setBusinessType(result.company.businessTypeLabel || "Completo / Multioperação");
+        }
+      } catch {
+        if (active) setBusinessType("Completo / Multioperação");
+      }
     }
 
-    refreshBusinessType();
-    window.addEventListener("storage", refreshBusinessType);
-    window.addEventListener("ajb-company-updated", refreshBusinessType);
-
+    loadBusinessType();
     return () => {
-      window.removeEventListener("storage", refreshBusinessType);
-      window.removeEventListener("ajb-company-updated", refreshBusinessType);
+      active = false;
     };
   }, []);
 
