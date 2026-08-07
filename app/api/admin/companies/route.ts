@@ -42,6 +42,24 @@ export async function GET() {
       },
     });
 
+    const billingRows = await prisma.$queryRaw<Array<{
+      companyId: string;
+      billingCycle: string;
+      paymentProvider: string;
+      providerSubscriptionId: string | null;
+      providerPayerEmail: string | null;
+      nextBillingAt: Date | null;
+    }>>`
+      SELECT "companyId", "billingCycle", "paymentProvider", "providerSubscriptionId", "providerPayerEmail", "nextBillingAt"
+      FROM "Subscription"
+    `;
+    const billingByCompany = new Map(billingRows.map((row) => [row.companyId, row]));
+
+    const enrichedCompanies = companies.map((company) => ({
+      ...company,
+      billing: billingByCompany.get(company.id) ?? null,
+    }));
+
     const summary = companies.reduce(
       (acc, company) => {
         if (company.isDemo) {
@@ -55,13 +73,17 @@ export async function GET() {
         if (company.subscriptionStatus === "PAST_DUE") acc.pastDue += 1;
         if (company.subscriptionStatus === "CANCELED") acc.canceled += 1;
         if (company.subscriptionStatus === "BLOCKED" || company.accessBlocked) acc.blocked += 1;
-        if (isRevenueCompany(company)) acc.monthlyRevenueCents += Number(company.subscription?.priceCents || 0);
+        if (isRevenueCompany(company)) {
+          const billing = billingByCompany.get(company.id);
+          const amount = Number(company.subscription?.priceCents || 0);
+          acc.monthlyRevenueCents += billing?.billingCycle === "YEARLY" ? Math.round(amount / 12) : amount;
+        }
         return acc;
       },
       { total: 0, demo: 0, active: 0, trial: 0, pastDue: 0, canceled: 0, blocked: 0, monthlyRevenueCents: 0 },
     );
 
-    return NextResponse.json({ success: true, summary, companies });
+    return NextResponse.json({ success: true, summary, companies: enrichedCompanies });
   } catch (error) {
     return platformAdminErrorResponse(error);
   }
