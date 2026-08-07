@@ -76,6 +76,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: "Nome do produto é obrigatório." }, { status: 400 });
   }
 
+  if (id) {
+    const existing = await prisma.product.findFirst({
+      where: { id, companyId: session.companyId, active: true },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ success: false, message: "Produto não encontrado para esta empresa." }, { status: 404 });
+    }
+  }
+
   const product = id
     ? await prisma.product.update({
         where: { id },
