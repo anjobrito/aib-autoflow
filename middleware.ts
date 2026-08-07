@@ -22,6 +22,7 @@ const protectedPrefixes = [
   "/comissoes",
   "/financiamentos-gravames",
   "/empresa",
+  "/assinatura",
 ];
 
 export function middleware(request: NextRequest) {
