@@ -19,6 +19,8 @@ jobs:
   build:
     name: Build and type-check
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/ajb_autoflow_ci
 
     steps:
       - name: Checkout repository
@@ -27,11 +29,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Generate Prisma client
         run: npx prisma generate
