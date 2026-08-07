@@ -80,7 +80,7 @@ model Company {
   cnpj               String             @unique
   businessType       BusinessType       @default(AUTO_REPAIR)
   email              String
-  phone              String?
+  phone               String?
   city               String?
   state              String?
   subscriptionStatus SubscriptionStatus @default(TRIAL)
@@ -101,6 +101,7 @@ model Company {
   suppliers          Supplier[]
   employees          Employee[]
   financialEntries   FinancialEntry[]
+  inspections        VehicleInspection[]
   subscription       Subscription?
 }
 
@@ -282,11 +283,36 @@ model WorkOrder {
   company       Company         @relation(fields: [companyId], references: [id])
   customer      Customer        @relation(fields: [customerId], references: [id])
   vehicle       Vehicle         @relation(fields: [vehicleId], references: [id])
+  inspection    VehicleInspection?
 
   @@index([companyId])
   @@index([customerId])
   @@index([vehicleId])
   @@index([companyId, code])
+}
+
+model VehicleInspection {
+  id               String   @id @default(cuid())
+  companyId        String
+  workOrderId      String   @unique
+  plate            String
+  mileage          String?
+  fuelLevel        String?
+  hasDocuments     Boolean  @default(false)
+  hasSpareTire     Boolean  @default(false)
+  hasJack          Boolean  @default(false)
+  hasPersonalItems Boolean  @default(false)
+  personalItems    String?
+  damages          String[] @default([])
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, workOrderId])
 }
 
 model MaintenanceReminder {
