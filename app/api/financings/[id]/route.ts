@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -20,6 +21,36 @@ function calculate(financedAmount: unknown, returnPercentage: unknown, ilaPercen
   const ila = gross * (ilaPct / 100);
   const net = Math.max(0, gross - ila);
   return { financed, returnPct, ilaPct, gross, ila, net };
+}
+
+function auditSnapshot(financing: {
+  customerId: string | null;
+  vehicleId: string | null;
+  contractNumber: string;
+  financedAmount: { toString(): string };
+  returnPercentage: { toString(): string };
+  returnAmount: { toString(): string };
+  ilaDiscountPercentage: { toString(): string };
+  ilaDiscountAmount: { toString(): string };
+  netReturnAmount: { toString(): string };
+  returnReceived: boolean;
+  financingStatus: string;
+  lienStatus: string;
+}) {
+  return {
+    customerId: financing.customerId,
+    vehicleId: financing.vehicleId,
+    contractNumber: financing.contractNumber,
+    financedAmount: financing.financedAmount.toString(),
+    returnPercentage: financing.returnPercentage.toString(),
+    returnAmount: financing.returnAmount.toString(),
+    ilaDiscountPercentage: financing.ilaDiscountPercentage.toString(),
+    ilaDiscountAmount: financing.ilaDiscountAmount.toString(),
+    netReturnAmount: financing.netReturnAmount.toString(),
+    returnReceived: financing.returnReceived,
+    financingStatus: financing.financingStatus,
+    lienStatus: financing.lienStatus,
+  };
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -80,6 +111,15 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     },
   });
 
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: existing.returnReceived !== financing.returnReceived ? (financing.returnReceived ? "FINANCING_RETURN_RECEIVED" : "FINANCING_RETURN_REOPENED") : "FINANCING_UPDATED",
+    entityType: "VehicleFinancing",
+    entityId: id,
+    oldValue: auditSnapshot(existing),
+    newValue: auditSnapshot(financing),
+  });
+
   return NextResponse.json({ success: true, financing });
 }
 
@@ -91,5 +131,13 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if (!existing) return NextResponse.json({ success: false, message: "Financiamento não encontrado." }, { status: 404 });
 
   await prisma.vehicleFinancing.delete({ where: { id } });
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "FINANCING_DELETED",
+    entityType: "VehicleFinancing",
+    entityId: id,
+    oldValue: auditSnapshot(existing),
+  });
+
   return NextResponse.json({ success: true });
 }
