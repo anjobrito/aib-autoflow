@@ -1,14 +1,23 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { demoProducts, demoServices } from "@/lib/demo-data";
 import { filterProductsByBusinessProfile, filterServicesByBusinessProfile, getOperationalFormLabels } from "@/lib/business-domain-options";
 import { getBusinessProfileByLabel } from "@/lib/business-profiles";
-import { currencyToNumber, getCompany, numberToCurrency } from "@/lib/browser-store";
 import { newWorkOrderStatuses } from "@/lib/select-options";
 
 function pct(value: number) {
   return `${value.toFixed(1).replace(".", ",")}%`;
+}
+
+function currencyToNumber(value?: string) {
+  if (!value) return 0;
+  const normalized = value.replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function numberToCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 }
 
 type NewWorkOrderFormProps = {
@@ -59,8 +68,9 @@ export function NewWorkOrderForm({ onSaved, onCancel, submitLabel = "Criar fluxo
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [businessType, setBusinessType] = useState("");
+  const [businessType, setBusinessType] = useState("Completo / Multioperação");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const businessProfile = useMemo(() => getBusinessProfileByLabel(businessType), [businessType]);
   const formLabels = useMemo(() => getOperationalFormLabels(businessProfile), [businessProfile]);
@@ -70,43 +80,51 @@ export function NewWorkOrderForm({ onSaved, onCancel, submitLabel = "Criar fluxo
   const vehicleOptions = useMemo(() => vehicles.filter((vehicle) => !selectedCustomerId || vehicle.customerId === selectedCustomerId), [vehicles, selectedCustomerId]);
 
   useEffect(() => {
+    let active = true;
+
     async function loadOptions() {
+      setLoading(true);
       setMessage("");
-      setBusinessType(getCompany().businessType);
 
       try {
-        const [customersResponse, vehiclesResponse, productsResponse, servicesResponse] = await Promise.all([
+        const [companyResponse, customersResponse, vehiclesResponse, productsResponse, servicesResponse] = await Promise.all([
+          fetch("/api/company/me", { cache: "no-store" }),
           fetch("/api/customers", { cache: "no-store" }),
           fetch("/api/vehicles", { cache: "no-store" }),
           fetch("/api/products", { cache: "no-store" }),
           fetch("/api/services", { cache: "no-store" }),
         ]);
 
-        const [customersResult, vehiclesResult, productsResult, servicesResult] = await Promise.all([
+        const [companyResult, customersResult, vehiclesResult, productsResult, servicesResult] = await Promise.all([
+          companyResponse.json(),
           customersResponse.json(),
           vehiclesResponse.json(),
           productsResponse.json(),
           servicesResponse.json(),
         ]);
 
-        if (!customersResponse.ok || !vehiclesResponse.ok || !productsResponse.ok || !servicesResponse.ok) {
-          throw new Error("APIs unavailable");
+        if (!active) return;
+
+        if (!companyResponse.ok || !customersResponse.ok || !vehiclesResponse.ok || !productsResponse.ok || !servicesResponse.ok) {
+          throw new Error("Não foi possível carregar os dados reais da empresa.");
         }
+
+        setBusinessType(companyResult.company?.businessTypeLabel || "Completo / Multioperação");
 
         const loadedCustomers = (customersResult.customers || []).map((customer: any) => ({ id: customer.id, name: customer.name }));
         const loadedVehicles = (vehiclesResult.vehicles || []).map((vehicle: any) => ({ id: vehicle.id, customerId: vehicle.customerId, label: `${vehicle.plate} - ${vehicle.brand || ""} ${vehicle.model || ""}`.trim() }));
         const loadedProducts = (productsResult.products || []).map((product: any) => ({
           id: product.id,
           name: product.name,
-          category: product.category,
+          category: product.category || "",
           costPrice: formatCurrency(Number(product.costPrice || 0)),
-          price: formatCurrency(Number(product.price || 0)),
+          price: formatCurrency(Number(product.salePrice || 0)),
         }));
         const loadedServices = (servicesResult.services || []).map((service: any) => ({
           id: service.id,
           name: service.name,
-          category: service.category,
-          duration: service.duration,
+          category: service.category || "",
+          duration: service.duration || "",
           price: formatCurrency(Number(service.price || 0)),
         }));
 
@@ -118,21 +136,24 @@ export function NewWorkOrderForm({ onSaved, onCancel, submitLabel = "Criar fluxo
         setSelectedVehicleId(loadedVehicles[0]?.id ?? "");
         setSelectedProduct(loadedProducts[0]?.name ?? "");
         setSelectedService(loadedServices[0]?.name ?? "");
-      } catch {
-        const profile = getBusinessProfileByLabel(getCompany().businessType);
-        const fallbackProducts = filterProductsByBusinessProfile(
-          demoProducts.map((product) => ({ ...product, supplier: "Fornecedor demo", costPrice: product.name.includes("Óleo") ? "R$ 30,00" : "R$ 20,00" })),
-          profile,
-        );
-        const fallbackServices = filterServicesByBusinessProfile(demoServices, profile);
 
-        setProducts(fallbackProducts.map((product) => ({ id: product.id, name: product.name, category: product.category, costPrice: product.costPrice, price: product.price })));
-        setServices(fallbackServices.map((service) => ({ id: service.id, name: service.name, category: service.category, duration: service.duration, price: service.price })));
-        setMessage("Cadastre clientes e veículos reais antes de criar ordens. Dados demo não geram OS no banco.");
+        if (loadedCustomers.length === 0 || loadedVehicles.length === 0) {
+          setMessage("Cadastre um cliente e um veículo antes de criar a ordem.");
+        }
+      } catch (cause) {
+        if (!active) return;
+        setCustomers([]);
+        setVehicles([]);
+        setProducts([]);
+        setServices([]);
+        setMessage(cause instanceof Error ? cause.message : "Não foi possível carregar os dados reais da empresa.");
+      } finally {
+        if (active) setLoading(false);
       }
     }
 
-    loadOptions();
+    void loadOptions();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -196,15 +217,15 @@ export function NewWorkOrderForm({ onSaved, onCancel, submitLabel = "Criar fluxo
     <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[1fr_360px]">
       <div className="rounded-3xl bg-white p-0">
         <h2 className="text-xl font-black text-slate-950">Dados do fluxo operacional</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Selecione cliente, veículo, etapa, item operacional e status inicial. Campos de domínio respeitam o perfil {businessProfile.label}.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Selecione cliente, veículo, etapa, item operacional e status inicial. Campos de domínio respeitam o perfil {businessProfile.label} carregado da empresa autenticada.</p>
 
         {message ? <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">{message}</div> : null}
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-bold text-slate-700">Cliente<select required name="customerId" value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white"><option value="" disabled>Selecione um cliente</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">Veículo<select required name="vehicleId" value={selectedVehicleId} onChange={(event) => setSelectedVehicleId(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white"><option value="" disabled>Selecione um veículo</option>{vehicleOptions.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.label}</option>)}</select></label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">{formLabels.serviceLabel}<select value={selectedService} onChange={(event) => setSelectedService(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white">{serviceOptions.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">{formLabels.productLabel}<select value={selectedProduct} onChange={(event) => setSelectedProduct(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white">{productOptions.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700">Cliente<select required name="customerId" value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)} disabled={loading} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white disabled:opacity-60"><option value="" disabled>{loading ? "Carregando..." : "Selecione um cliente"}</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700">Veículo<select required name="vehicleId" value={selectedVehicleId} onChange={(event) => setSelectedVehicleId(event.target.value)} disabled={loading} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white disabled:opacity-60"><option value="" disabled>{loading ? "Carregando..." : "Selecione um veículo"}</option>{vehicleOptions.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.label}</option>)}</select></label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700">{formLabels.serviceLabel}<select value={selectedService} onChange={(event) => setSelectedService(event.target.value)} disabled={loading || serviceOptions.length === 0} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white disabled:opacity-60"><option value="">Nenhum serviço</option>{serviceOptions.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700">{formLabels.productLabel}<select value={selectedProduct} onChange={(event) => setSelectedProduct(event.target.value)} disabled={loading || productOptions.length === 0} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white disabled:opacity-60"><option value="">Nenhum produto</option>{productOptions.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>
           <label className="grid gap-2 text-sm font-bold text-slate-700">{formLabels.quantityLabel}<input required value={quantity} onChange={(event) => setQuantity(event.target.value)} inputMode="numeric" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white" /></label>
           <label className="grid gap-2 text-sm font-bold text-slate-700">Status<select required name="status" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white">{newWorkOrderStatuses.map((item) => <option key={item}>{item}</option>)}</select></label>
         </div>
@@ -214,7 +235,7 @@ export function NewWorkOrderForm({ onSaved, onCancel, submitLabel = "Criar fluxo
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           {saved ? <span className="text-sm font-bold text-emerald-700">Fluxo criado!</span> : null}
           {onCancel ? <button type="button" onClick={onCancel} className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Cancelar</button> : null}
-          <button className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700">{submitLabel}</button>
+          <button disabled={loading || !selectedCustomerId || !selectedVehicleId} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60">{submitLabel}</button>
         </div>
       </div>
 
