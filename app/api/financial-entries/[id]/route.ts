@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -18,6 +19,23 @@ function parseDate(value: string) {
 
 async function findOwnedEntry(id: string, companyId: string) {
   return prisma.financialEntry.findFirst({ where: { id, companyId } });
+}
+
+function snapshot(entry: Awaited<ReturnType<typeof findOwnedEntry>>) {
+  if (!entry) return null;
+  return {
+    type: entry.type,
+    description: entry.description,
+    personName: entry.personName,
+    reference: entry.reference,
+    category: entry.category,
+    amount: entry.amount.toString(),
+    dueDate: entry.dueDate,
+    settledAt: entry.settledAt,
+    status: entry.status,
+    paymentMethod: entry.paymentMethod,
+    notes: entry.notes,
+  };
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -45,7 +63,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const amount = parseAmount(amountRaw);
   const dueDate = parseDate(dueDateRaw);
 
-  if (!['Pagar', 'Receber'].includes(type) || !description || !category || amount <= 0 || !dueDate || Number.isNaN(dueDate.getTime())) {
+  if (!["Pagar", "Receber"].includes(type) || !description || !category || amount <= 0 || !dueDate || Number.isNaN(dueDate.getTime())) {
     return NextResponse.json({ success: false, message: "Dados do lançamento inválidos." }, { status: 400 });
   }
 
@@ -64,6 +82,15 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       paymentMethod: paymentMethod || null,
       notes: notes || null,
     },
+  });
+
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "FINANCIAL_ENTRY_UPDATED",
+    entityType: "FinancialEntry",
+    entityId: id,
+    oldValue: snapshot(existing),
+    newValue: snapshot(entry),
   });
 
   return NextResponse.json({ success: true, entry });
@@ -93,6 +120,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     },
   });
 
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: settled ? "FINANCIAL_ENTRY_SETTLED" : "FINANCIAL_ENTRY_STATUS_CHANGED",
+    entityType: "FinancialEntry",
+    entityId: id,
+    field: "status",
+    oldValue: { status: existing.status, settledAt: existing.settledAt },
+    newValue: { status: entry.status, settledAt: entry.settledAt },
+  });
+
   return NextResponse.json({ success: true, entry });
 }
 
@@ -106,5 +143,13 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   }
 
   await prisma.financialEntry.delete({ where: { id } });
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "FINANCIAL_ENTRY_DELETED",
+    entityType: "FinancialEntry",
+    entityId: id,
+    oldValue: snapshot(existing),
+  });
+
   return NextResponse.json({ success: true });
 }
