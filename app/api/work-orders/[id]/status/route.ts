@@ -3,6 +3,7 @@ import { WorkOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
 import { finalizedPrismaStatuses } from "@/lib/work-order-lifecycle";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       closedAt: isFinalized ? existing.closedAt || new Date() : null,
     },
     include: { customer: true, vehicle: true },
+  });
+
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: isFinalized && !finalizedPrismaStatuses.includes(existing.status as any) ? "WORK_ORDER_FINALIZED" : "WORK_ORDER_STATUS_CHANGED",
+    entityType: "WorkOrder",
+    entityId: id,
+    field: "status",
+    oldValue: { status: existing.status, closedAt: existing.closedAt },
+    newValue: { status: order.status, closedAt: order.closedAt },
+    metadata: { code: order.code },
   });
 
   return NextResponse.json({ success: true, finalized: isFinalized, order: formatOrder(order) });
