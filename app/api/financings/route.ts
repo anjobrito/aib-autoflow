@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -101,6 +102,27 @@ export async function POST(request: Request) {
       lienStatus: String(body.lienStatus ?? "NAO_INICIADO"),
       returnReceived: Boolean(body.returnReceived),
       notes: String(body.notes ?? "").trim(),
+    },
+  });
+
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "FINANCING_CREATED",
+    entityType: "VehicleFinancing",
+    entityId: financing.id,
+    newValue: {
+      customerId: financing.customerId,
+      vehicleId: financing.vehicleId,
+      contractNumber: financing.contractNumber,
+      financedAmount: financing.financedAmount.toString(),
+      returnPercentage: financing.returnPercentage.toString(),
+      returnAmount: financing.returnAmount.toString(),
+      ilaDiscountPercentage: financing.ilaDiscountPercentage.toString(),
+      ilaDiscountAmount: financing.ilaDiscountAmount.toString(),
+      netReturnAmount: financing.netReturnAmount.toString(),
+      returnReceived: financing.returnReceived,
+      financingStatus: financing.financingStatus,
+      lienStatus: financing.lienStatus,
     },
   });
 
