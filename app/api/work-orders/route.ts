@@ -3,6 +3,7 @@ import { WorkOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentSession } from "@/lib/saas-auth";
 import { activePrismaStatuses, finalizedPrismaStatuses } from "@/lib/work-order-lifecycle";
+import { recordAuditEvent, tenantAuditActor } from "@/lib/audit";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -162,6 +163,24 @@ export async function POST(request: Request) {
       closedAt: finalizedPrismaStatuses.includes(mappedStatus as any) ? new Date() : null,
     },
     include: { customer: true, vehicle: true },
+  });
+
+  await recordAuditEvent({
+    ...tenantAuditActor(session),
+    action: "WORK_ORDER_CREATED",
+    entityType: "WorkOrder",
+    entityId: order.id,
+    newValue: {
+      code: order.code,
+      customerId: order.customerId,
+      vehicleId: order.vehicleId,
+      status: order.status,
+      description: order.description,
+      totalParts: order.totalParts.toString(),
+      totalServices: order.totalServices.toString(),
+      totalAmount: order.totalAmount.toString(),
+      closedAt: order.closedAt,
+    },
   });
 
   return NextResponse.json({ success: true, order: formatOrder(order) });
