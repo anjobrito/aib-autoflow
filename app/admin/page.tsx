@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { ShieldCheck, RefreshCw, Building2, LogOut, UserRoundCog } from "lucide-react";
+import { ShieldCheck, RefreshCw, Building2, LogOut, UserRoundCog, CreditCard } from "lucide-react";
 import { AdminCommercialSummary } from "@/components/admin-commercial-summary";
 
 type AdminSummary = {
@@ -36,6 +36,13 @@ type AdminCompany = {
     lastPaidAt?: string | null;
     notes?: string | null;
   } | null;
+  billing?: {
+    billingCycle: string;
+    paymentProvider: string;
+    providerSubscriptionId?: string | null;
+    providerPayerEmail?: string | null;
+    nextBillingAt?: string | null;
+  } | null;
   users: Array<{
     id: string;
     name: string;
@@ -54,7 +61,7 @@ const emptySummary: AdminSummary = { total: 0, active: 0, trial: 0, pastDue: 0, 
 const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-blue-500 focus:bg-white";
 const labelClass = "grid gap-2 text-sm font-bold text-slate-700";
 const subscriptionStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED", "BLOCKED"];
-const planOptions = ["BASIC", "PRO", "ENTERPRISE", "PILOT"];
+const planOptions = ["BASIC", "START_MONTHLY", "START_YEARLY", "PRO", "ENTERPRISE", "PILOT"];
 
 function formatCurrency(priceCents?: number) {
   return ((priceCents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -68,6 +75,10 @@ function formatDate(value?: string | null) {
 function dateInputValue(value?: string | null) {
   if (!value) return "";
   return new Date(value).toISOString().slice(0, 10);
+}
+
+function providerLabel(value?: string | null) {
+  return value === "MERCADO_PAGO" ? "Mercado Pago" : "Manual";
 }
 
 export default function AdminPage() {
@@ -142,6 +153,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
+            <a href="/admin/auditoria" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-black text-white hover:bg-white hover:text-slate-950">Auditoria</a>
             <a href="/admin/usuarios-ajbsystems" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-black text-white hover:bg-white hover:text-slate-950">
               <UserRoundCog className="h-4 w-4" />
               Usuários AJBSYSTEMS
@@ -164,7 +176,7 @@ export default function AdminPage() {
           <h1 className="mt-1 text-3xl font-black">Controle comercial do SaaS</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Esta área é exclusiva da AJBSYSTEMS. MASTER controla tudo, BILLING altera licenças e SUPPORT acompanha empresas para suporte.
-            Usuários de oficina entram pelo AJB AutoFlow em /entrar e usam roles próprias da empresa cliente.
+            Cobranças Mercado Pago e liberações manuais convivem como fluxos complementares.
           </p>
         </div>
 
@@ -176,18 +188,19 @@ export default function AdminPage() {
         <div className="grid gap-5">
           {companies.map((company) => {
             const subscription = company.subscription;
+            const billing = company.billing;
             return (
               <article key={company.id} className="rounded-[2rem] bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><Building2 className="h-5 w-5" /></div>
-                      <div>
-                        <h2 className="text-xl font-black">{company.tradeName || company.name}</h2>
-                        <p className="text-sm text-slate-500">{company.name} • {company.cnpj}</p>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-xl font-black">{company.tradeName || company.name}</h2>
+                        <p className="truncate text-sm text-slate-500">{company.name} • {company.cnpj}</p>
                       </div>
                     </div>
-                    <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 xl:grid-cols-4">
                       <p><strong>Status:</strong> {company.subscriptionStatus}</p>
                       <p><strong>Plano:</strong> {subscription?.plan || "-"}</p>
                       <p><strong>Valor:</strong> {formatCurrency(subscription?.priceCents)}</p>
@@ -197,6 +210,18 @@ export default function AdminPage() {
                       <p><strong>Último pagamento:</strong> {formatDate(subscription?.lastPaidAt)}</p>
                       <p><strong>Cadastros:</strong> {company._count.customers} clientes / {company._count.vehicles} veículos / {company._count.workOrders} OS</p>
                     </div>
+
+                    <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-slate-700">
+                      <div className="flex items-center gap-2 font-black text-slate-950"><CreditCard className="h-4 w-4 text-blue-700" /> Billing</div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        <p><strong>Provedor:</strong> {providerLabel(billing?.paymentProvider)}</p>
+                        <p><strong>Ciclo:</strong> {billing?.billingCycle === "YEARLY" ? "Anual" : "Mensal"}</p>
+                        <p><strong>Próxima cobrança:</strong> {formatDate(billing?.nextBillingAt)}</p>
+                        <p><strong>Pagador:</strong> {billing?.providerPayerEmail || company.email}</p>
+                      </div>
+                      {billing?.providerSubscriptionId ? <p className="mt-2 break-all text-xs text-slate-500">Assinatura Mercado Pago: {billing.providerSubscriptionId}</p> : null}
+                    </div>
+
                     <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                       <p className="font-black text-slate-950">Usuários da empresa cliente</p>
                       <div className="mt-2 grid gap-1">
@@ -205,10 +230,11 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <form onSubmit={(event) => handleLicenseSubmit(event, company.id)} className="grid min-w-full gap-3 rounded-3xl border border-slate-200 p-4 lg:min-w-[360px]">
+                  <form onSubmit={(event) => handleLicenseSubmit(event, company.id)} className="grid min-w-full gap-3 rounded-3xl border border-slate-200 p-4 lg:min-w-[360px] lg:max-w-[390px]">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Controle manual / contingência</p>
                     <label className={labelClass}>Status<select name="status" defaultValue={subscription?.status || company.subscriptionStatus} className={inputClass}>{subscriptionStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
                     <label className={labelClass}>Plano<select name="plan" defaultValue={subscription?.plan || "BASIC"} className={inputClass}>{planOptions.map((plan) => <option key={plan}>{plan}</option>)}</select></label>
-                    <label className={labelClass}>Valor em centavos<input name="priceCents" defaultValue={subscription?.priceCents || 9700} inputMode="numeric" className={inputClass} /></label>
+                    <label className={labelClass}>Valor em centavos<input name="priceCents" defaultValue={subscription?.priceCents || 4990} inputMode="numeric" className={inputClass} /></label>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className={labelClass}>Trial até<input name="trialEndsAt" type="date" defaultValue={dateInputValue(subscription?.trialEndsAt)} className={inputClass} /></label>
                       <label className={labelClass}>Expira em<input name="expiresAt" type="date" defaultValue={dateInputValue(subscription?.expiresAt)} className={inputClass} /></label>
