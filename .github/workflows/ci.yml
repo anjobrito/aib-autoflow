@@ -4,9 +4,12 @@ on:
   pull_request:
     branches:
       - main
+      - feature/saas-foundation-prisma-postgres-auth
   push:
     branches:
       - main
+      - feature/saas-foundation-prisma-postgres-auth
+      - feature/**
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -29,6 +32,12 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
 
       - name: Run production build
         run: npm run build
