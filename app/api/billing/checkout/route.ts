@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireCurrentSession } from "@/lib/saas-auth";
+import { getCurrentSession } from "@/lib/saas-auth";
 import { createMercadoPagoSubscription, getBillingPriceCents, mercadoPagoConfigured, type BillingCycle } from "@/lib/mercado-pago";
 
 export const runtime = "nodejs";
@@ -17,7 +17,11 @@ function parseCycle(value?: string): BillingCycle | null {
 
 export async function POST(request: Request) {
   try {
-    const session = await requireCurrentSession();
+    const session = await getCurrentSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Não autenticado." }, { status: 401 });
+    }
+
     const body = (await request.json().catch(() => ({}))) as CheckoutBody;
     const cycle = parseCycle(body.cycle);
 
@@ -100,16 +104,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("[AJB-BILLING] Falha ao criar checkout", error);
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ success: false, error: "Não autenticado." }, { status: 401 });
-    }
-    if (error instanceof Error && error.message.startsWith("LicenseBlocked:")) {
-      // A tela de licença precisa conseguir iniciar a regularização mesmo quando a licença operacional está bloqueada.
-      return NextResponse.json(
-        { success: false, error: "Sessão bloqueada para operação. Entre novamente para iniciar a regularização." },
-        { status: 403 },
-      );
-    }
     return NextResponse.json({ success: false, error: "Não foi possível iniciar a cobrança automática." }, { status: 500 });
   }
 }
